@@ -32,13 +32,14 @@ const XSS='</textarea><img src=x onerror="document.title=\'PWNED\'">"><svg onloa
 function fakeGitHub(files,opts={}){
   const repo={private:opts.private!==false,permissions:{push:true},default_branch:'main'};
   const calls=[];
-  const dirs=()=>{const d={};for(const p of Object.keys(files)){const [dir,name]=p.split('/');(d[dir]=d[dir]||[]).push({path:name,type:'blob',sha:sha1(files[p])});}return d;};
+  const dirs=()=>{const d={};for(const p of Object.keys(files)){if(!p.includes('/'))continue;const [dir,name]=p.split('/');(d[dir]=d[dir]||[]).push({path:name,type:'blob',sha:sha1(files[p])});}return d;};
+  const rootBlobs=()=>Object.keys(files).filter(p=>!p.includes('/')).map(p=>({path:p,type:'blob',sha:sha1(files[p])}));
   async function handler(route){
     const req=route.request(),u=new URL(req.url()),m=req.method(),p=u.pathname.replace('/repos/me/data','');
     calls.push(m+' '+p);
     const json=(status,body)=>route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
     if(p===''&&m==='GET')return json(200,repo);
-    if(p==='/git/trees/main'){const d=dirs();return json(200,{tree:Object.keys(d).map(k=>({path:k,type:'tree',sha:'tree-'+k}))});}
+    if(p==='/git/trees/main'){const d=dirs();return json(200,{tree:Object.keys(d).map(k=>({path:k,type:'tree',sha:'tree-'+k})).concat(rootBlobs())});}
     if(p.startsWith('/git/trees/tree-')){const d=dirs()[p.slice('/git/trees/tree-'.length)]||[];return json(200,{tree:d});}
     if(p.startsWith('/contents/')){
       const f=p.slice('/contents/'.length);
@@ -330,14 +331,14 @@ test('settings has a close button in the top right corner',async()=>{
   await ctx.close();
 });
 
-test('a focused input is never left under the status bar strip',async()=>{
+test('a focused input is never left under the tab bar',async()=>{
   const {ctx,page}=await openApp({hash:'log',ctxOpts:{viewport:{width:390,height:700}}});
-  await page.addStyleTag({content:'#sb-band{height:59px!important}'}); // the iPhone 15 Pro Max inset; Chromium reports 0
   const sel='input[data-ex][data-i="0"][data-f="reps"]';
-  await page.evaluate(sel=>{const i=document.querySelector(sel).getBoundingClientRect().top;window.scrollBy(0,i-30);},sel);
+  // put the input partly behind the floating tab bar
+  await page.evaluate(sel=>{const n=document.querySelector('.nav').getBoundingClientRect().top,i=document.querySelector(sel).getBoundingClientRect().bottom;window.scrollBy(0,i-n-10);},sel);
   await page.focus(sel);await page.waitForTimeout(400);
-  const r=await page.evaluate(sel=>({band:document.querySelector('#sb-band').getBoundingClientRect().bottom,input:document.querySelector(sel).getBoundingClientRect().top}),sel);
-  assert.ok(r.input>=r.band,`input top ${r.input} vs strip bottom ${r.band}`);
+  const r=await page.evaluate(sel=>({nav:document.querySelector('.nav').getBoundingClientRect().top,input:document.querySelector(sel).getBoundingClientRect().bottom}),sel);
+  assert.ok(r.input<=r.nav,`input bottom ${r.input} vs tab bar top ${r.nav}`);
   await ctx.close();
 });
 
@@ -400,32 +401,18 @@ test('the glass slider sets how clear the bars are, and is remembered',async()=>
   await ctx.close();
 });
 
-test('the background runs under the iPhone status bar',async()=>{
+test('iOS draws its own status bar above the page',async()=>{
   const html=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
-  assert.match(html,/<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">/);
-  assert.match(html,/viewport-fit=cover/);
-  // a fixed strip behind the clock keeps scrolled content from showing through it; it fades, it does not blur.
-  // iOS draws the clock in white here, so light mode's strip carries the accent shade.
-  const band={};
-  for(const mode of ['light','dark']){
-    const {ctx,page}=await openApp({hash:'stats',ls:theme(mode)});
-    band[mode]=await page.$eval('#sb-band',b=>{const cs=getComputedStyle(b);return {pos:cs.position,top:cs.top,pe:cs.pointerEvents,img:cs.backgroundImage,bf:cs.backdropFilter||cs.webkitBackdropFilter||'none'};});
-    await ctx.close();
-  }
-  for(const m of ['light','dark']){
-    assert.equal(band[m].pos,'fixed');assert.equal(band[m].top,'0px');assert.equal(band[m].pe,'none');
-    assert.match(band[m].img,/gradient/);assert.equal(band[m].bf,'none');
-  }
-  assert.notEqual(band.light.img,band.dark.img,'light strip carries the accent shade');
+  assert.match(html,/<meta name="apple-mobile-web-app-status-bar-style" content="default">/);
+  assert.doesNotMatch(html,/sb-band/);
 });
 
-
-test('nothing in the header is drawn with filters or blur, and it sits clear of the clock',async()=>{
+test('nothing in the header is drawn with filters or blur',async()=>{
   const {ctx,page}=await openApp({hash:'stats',ls:theme('dark')});
   const r=await page.evaluate(()=>{const fx=[...document.querySelectorAll('header, header *')].map(e=>{const s=getComputedStyle(e);return [s.filter,s.backdropFilter||s.webkitBackdropFilter||'none',s.willChange,s.transform];}).filter(v=>v[0]!=='none'||v[1]!=='none'||v[2]!=='auto'||v[3]!=='none');
     return {fx,pad:parseFloat(getComputedStyle(document.querySelector('header')).paddingTop)};});
   assert.deepEqual(r.fx,[],'no filter/backdrop/will-change/transform in the header');
-  assert.ok(r.pad>=44,'header top padding beyond the inset (clear of the iOS top-edge blur): '+r.pad);
+  assert.ok(r.pad>=10&&r.pad<=20,'header top padding '+r.pad);
   await ctx.close();
 });
 
@@ -440,4 +427,42 @@ test('the release workflow reads the same version the app shows in Settings',asy
   const shown=fs.readFileSync(path.join(ROOT,'split.js'),'utf8').match(/const BUILD='([^']+)'/)[1];
   assert.equal(v,shown);
   assert.match(v,/^\d{4}-\d{2}-\d{2}\.\d{6}$/);
+});
+
+test('theme and target weight are saved to the data repo',async()=>{
+  const gh=fakeGitHub({});
+  const {ctx,page}=await openApp({gh,hash:'stats',ls:{'split-sync-cfg-v1':CFG}});
+  await waitSync(page);
+  await page.click('#gear');
+  await page.click('#th-mode button[data-mode="dark"]');
+  await page.click('#th-acc button[data-acc="forest"]');
+  await page.fill('#set-target','82.5');await page.dispatchEvent('#set-target','change');
+  await page.waitForFunction(()=>true);
+  const deadline=Date.now()+15000;
+  while(Date.now()<deadline){const f=gh.files['settings.json'];if(f&&JSON.parse(f).targetKg===82.5&&JSON.parse(f).theme.accent==='forest')break;await page.waitForTimeout(250);}
+  const saved=JSON.parse(gh.files['settings.json']);
+  assert.equal(saved.theme.mode,'dark');assert.equal(saved.theme.accent,'forest');assert.equal(saved.targetKg,82.5);
+  assert.ok(!isNaN(Date.parse(saved.updatedAt)));
+  await ctx.close();
+});
+
+test('a fresh install gets its theme and target weight back from the repo',async()=>{
+  const gh=fakeGitHub({'settings.json':JSON.stringify({updatedAt:'2026-01-01T00:00:00.000Z',theme:{mode:'black',accent:'ocean',contrast:'normal',glass:30},targetKg:80})});
+  const {ctx,page}=await openApp({gh,hash:'stats',ls:{'split-sync-cfg-v1':CFG}});
+  await waitSync(page);
+  await page.waitForFunction(()=>document.documentElement.dataset.scheme==='black',null,{timeout:10000});
+  const r=await page.evaluate(()=>({accent:document.documentElement.dataset.accent,target:localStorage.getItem('split-target-kg-v1'),glass:document.documentElement.style.getPropertyValue('--tint')}));
+  assert.deepEqual(r,{accent:'ocean',target:'80',glass:'0.3'});
+  assert.ok(!gh.calls.some(c=>c==='PUT /contents/settings.json'),'restoring does not write the file back');
+  await ctx.close();
+});
+
+test('malformed settings in the repo are ignored',async()=>{
+  const gh=fakeGitHub({'settings.json':JSON.stringify({updatedAt:'2030-01-01T00:00:00.000Z',theme:{mode:'"><img src=x onerror=alert(1)>',accent:'nope',contrast:9,glass:'lots'},targetKg:'heavy'})});
+  const {ctx,page,errors}=await openApp({gh,hash:'stats',ls:Object.assign({'split-sync-cfg-v1':CFG},theme('light'))});
+  await waitSync(page);await page.waitForTimeout(300);
+  const r=await page.evaluate(()=>({scheme:document.documentElement.dataset.scheme,accent:document.documentElement.dataset.accent,target:localStorage.getItem('split-target-kg-v1')}));
+  assert.deepEqual(r,{scheme:'light',accent:'clay',target:null});
+  assert.deepEqual(errors,[]);
+  await ctx.close();
 });
