@@ -91,6 +91,8 @@ Your workouts always save on the phone first. Sync adds a second copy in a priva
    - Expiry: 90 days.
 3. In the app: tap the gear, enter `your-name/your-repo` and the token, then **Save & test**.
 
+Your theme and target weight sync too, so after reinstalling the app you only re-enter the repo and token: the rest comes back on the first sync. The token itself is never stored in the repo.
+
 The app refuses to sync to a public repo. The token is stored only in the phone's browser storage, and the app's content security policy lets it talk to `api.github.com` and nothing else.
 
 ### Data layout in the private repo
@@ -98,6 +100,7 @@ The app refuses to sync to a public repo. The token is stored only in the phone'
 ```
 sessions/YYYY-MM-DD.json   one file per workout, written by the app
 coach/YYYY-MM-DD.json      optional notes for that day, read by the app
+settings.json              theme and target weight, written and read by the app
 ```
 
 A session looks like this:

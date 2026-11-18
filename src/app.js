@@ -20,6 +20,7 @@ let sampleCache=null;
 /* ---------- local-first data layer + GitHub sync ---------- */
 const LS_CO='split-coach-v1',LS_CS='split-coach-shas-v1';
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const LS_SAT='split-settings-at-v1',LS_SDIRTY='split-settings-dirty-v1',LS_SSHA='split-settings-sha-v1';
 const LS_S='split-sessions-v2',LS_SA='split-sessions-at-v1',LS_Q='split-queue-v1',LS_C='split-sync-cfg-v1',LS_H='split-shas-v1',LS_L='split-lastsync-v1';
 const BUILD='__BUILD__';
 const DATE_RE=/^\d{4}-\d{2}-\d{2}$/,FILE_RE=/^\d{4}-\d{2}-\d{2}\.json$/,REPO_RE=/^[\w.-]+\/[\w.-]+$/;
@@ -125,8 +126,9 @@ function refreshViews(){
   const ae=document.activeElement,typing=ae&&/INPUT|TEXTAREA/.test(ae.tagName);
   if(!typing){if(!state.dirty)initDraft(state.date);renderAll();}else renderStats();
 }
+let syncAgain=false;
 async function runSync(){
-  if(syncing)return;const c=cfg();
+  if(syncing){syncAgain=true;return;}const c=cfg();
   if(!c){syncState='off';refreshStatus();return;}
   if(navigator.onLine===false){syncState='offline';refreshStatus();return;}
   syncing=true;syncState='syncing';refreshStatus();
@@ -194,11 +196,26 @@ async function runSync(){
       for(const k of Object.keys(co)){if(k<keep){delete co[k];delete cs[k];}}
       lsSet(LS_CO,co);lsSet(LS_CS,cs);state.coach=co;
     }catch(e){}
+    /* 5. settings.json (theme and target weight): the newer side wins */
+    try{
+      const f=root.find(t=>t.path==='settings.json'&&t.type==='blob');
+      if(!f&&!lsGet(LS_SAT,null)){lsSet(LS_SAT,new Date().toISOString());lsSet(LS_SDIRTY,true);}/* first sync: upload what this phone has */
+      if(f&&f.sha!==lsGet(LS_SSHA,null)){
+        const g=await gh('/contents/settings.json');
+        if(g.ok){let r=null;try{r=cleanSettings(JSON.parse(unb64((await g.json()).content)));}catch(e){}
+          if(r&&r.updatedAt>(lsGet(LS_SAT,'')||''))applyRemoteSettings(r);
+          lsSet(LS_SSHA,f.sha);}
+      }
+      if(lsGet(LS_SDIRTY,false)){
+        const r=await gh('/contents/settings.json',{method:'PUT',body:JSON.stringify({message:'settings',content:b64(JSON.stringify(localSettings(),null,1)),sha:f?f.sha:undefined})});
+        if(r.ok){const j=await r.json();lsSet(LS_SSHA,j.content.sha);lsSet(LS_SDIRTY,false);}
+      }
+    }catch(e){}
     if(changed){state.real=Object.keys(state.sessions).length>0;await persistSessions();refreshViews();}
     syncAt=new Date().toISOString();lsSet(LS_L,syncAt);syncErr='';
     syncState=Object.keys(queueGet()).length?'pending':'ok';
     syncing=false;refreshStatus();
-    if(syncState==='pending')schedSync(500);
+    if(syncState==='pending'||syncAgain){syncAgain=false;schedSync(500);}
   }catch(e){
     syncing=false;
     if(e&&e.kind==='public'){syncState='error';syncErr='repo is public, sync paused';}
@@ -635,15 +652,12 @@ window.addEventListener('pagehide',()=>{if(state.dirty)autoSave();});
 window.addEventListener('focus',rollover);
 window.addEventListener('online',()=>schedSync(500));
 document.addEventListener('visibilitychange',()=>{if(document.hidden){if(Object.keys(queueGet()).length)schedSync(0);}else schedSync(500);});
-/* Keep a focused field clear of the status-bar strip and the floating tab bar. iOS only scrolls a field into
-   the viewport when the keyboard opens, which can leave it underneath the clock. */
+/* Keep a focused field clear of the top edge and the floating tab bar. iOS only scrolls a field into
+   the viewport when the keyboard opens, which can leave it behind the tab bar. */
 function keepClear(t){
-  const b=$('#sb-band'),n=$('.nav'),r=t.getBoundingClientRect(),top=(b?b.getBoundingClientRect().bottom:0)+8,bot=n?n.getBoundingClientRect().top-8:innerHeight;
+  const n=$('.nav'),r=t.getBoundingClientRect(),top=8,bot=n?n.getBoundingClientRect().top-8:innerHeight;
   if(r.top<top)window.scrollBy(0,r.top-top);else if(r.bottom>bot&&r.height<bot-top)window.scrollBy(0,r.bottom-bot);
 }
-/* dark modes fade the status-bar strip in once the page has scrolled */
-const markScrolled=()=>document.documentElement.classList.toggle('scrolled',scrollY>8);
-window.addEventListener('scroll',markScrolled,{passive:true});markScrolled();
 document.addEventListener('focusin',e=>{const t=e.target;if(!t.matches||!t.matches('input,textarea,select')||t.closest('dialog'))return;[60,350].forEach(ms=>setTimeout(()=>{if(document.activeElement===t)keepClear(t);},ms));});
 /* ---------- themes ---------- */
 const LS_TH='split-theme-v1';
@@ -658,7 +672,27 @@ function applyTheme(){
   const hc=$('#th-hc');if(hc)hc.checked=T.contrast==='high';
   const gl=$('#th-glass');if(gl)gl.value=String(glassOf(T));
 }
-function setTheme(p){lsSet(LS_TH,Object.assign(themeGet(),p));applyTheme();}
+function setTheme(p){lsSet(LS_TH,Object.assign(themeGet(),p));applyTheme();settingsChanged();}
+/* theme and target weight also live in the data repo as settings.json, so a reinstall gets them back after sign-in */
+const MODES=['auto','light','dark','black'],ACCENTS=['clay','ocean','forest','violet','graphite'];
+function cleanSettings(o){
+  if(!o||typeof o!=='object'||typeof o.updatedAt!=='string'||isNaN(Date.parse(o.updatedAt)))return null;
+  const t=o.theme&&typeof o.theme==='object'?o.theme:{},out={updatedAt:o.updatedAt,theme:{}};
+  if(MODES.includes(t.mode))out.theme.mode=t.mode;
+  if(ACCENTS.includes(t.accent))out.theme.accent=t.accent;
+  if(t.contrast==='normal'||t.contrast==='high')out.theme.contrast=t.contrast;
+  if(typeof t.glass==='number'&&t.glass>=0&&t.glass<=100)out.theme.glass=t.glass;
+  out.targetKg=typeof o.targetKg==='number'&&o.targetKg>0&&o.targetKg<500?o.targetKg:null;
+  return out;
+}
+function localSettings(){return{updatedAt:lsGet(LS_SAT,null)||new Date().toISOString(),theme:themeGet(),targetKg:targetKg()};}
+function settingsChanged(){lsSet(LS_SAT,new Date().toISOString());lsSet(LS_SDIRTY,true);if(cfg())schedSync(2000);}
+function applyRemoteSettings(r){
+  lsSet(LS_TH,Object.assign(themeGet(),r.theme));
+  if(r.targetKg)lsSet(LS_T,r.targetKg);else{try{localStorage.removeItem(LS_T);}catch(e){}}
+  lsSet(LS_SAT,r.updatedAt);lsSet(LS_SDIRTY,false);
+  applyTheme();const st=$('#set-target');if(st&&document.activeElement!==st)st.value=targetKg()||'';try{renderStats();}catch(e){}
+}
 $('#th-mode').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setTheme({mode:b.dataset.mode});});
 $('#th-acc').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setTheme({accent:b.dataset.acc});});
 $('#th-hc').addEventListener('change',e=>setTheme({contrast:e.target.checked?'high':'normal'}));
@@ -671,7 +705,7 @@ function openSettings(){const c=cfg();$('#set-repo').value=c?c.repo:'';$('#set-t
 $('#gear').addEventListener('click',openSettings);
 $('#set-close').addEventListener('click',()=>dlg.close());
 $('#set-x').addEventListener('click',()=>dlg.close());
-$('#set-target').addEventListener('change',e=>{const v=Number(String(e.target.value).replace(',','.'));if(v>0)lsSet(LS_T,v);else localStorage.removeItem(LS_T);try{renderStats();}catch(x){}});
+$('#set-target').addEventListener('change',e=>{const v=Number(String(e.target.value).replace(',','.'));if(v>0)lsSet(LS_T,v);else localStorage.removeItem(LS_T);settingsChanged();try{renderStats();}catch(x){}});
 $('#set-save').addEventListener('click',async()=>{
   const repo=$('#set-repo').value.trim().replace(/^https?:\/\/github\.com\//,'').replace(/\.git$/,''),old=cfg(),token=$('#set-token').value.trim()||(old&&old.token)||'',m=$('#set-msg');
   if(!REPO_RE.test(repo)||!token){m.textContent='Enter the repo as owner/name and paste the token.';return;}
@@ -690,7 +724,7 @@ $('#set-save').addEventListener('click',async()=>{
   saveCfg(c,old);m.textContent='Connected. Syncing…';syncState='pending';schedSync(100);setTimeout(()=>{refreshStatus();m.textContent='Connected.';},2500);
 });
 /* sync bookkeeping belongs to one repo: switching repos starts it fresh so nothing is mistaken for a remote delete */
-function saveCfg(c,old){if(!old||old.repo.toLowerCase()!==c.repo.toLowerCase()){[LS_H,LS_CS,LS_CO].forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});state.coach={};}lsSet(LS_C,c);}
+function saveCfg(c,old){if(!old||old.repo.toLowerCase()!==c.repo.toLowerCase()){[LS_H,LS_CS,LS_CO,LS_SSHA].forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});state.coach={};}lsSet(LS_C,c);}
 $('#set-now').addEventListener('click',()=>{$('#set-msg').textContent='';schedSync(0);});
 $('#set-off').addEventListener('click',()=>{localStorage.removeItem(LS_C);syncState='off';refreshStatus();$('#set-msg').textContent='Sync turned off. Logs stay on this phone.';});
 $('#set-export').addEventListener('click',()=>{
