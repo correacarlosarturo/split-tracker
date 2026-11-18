@@ -428,3 +428,16 @@ test('nothing in the header is drawn with filters or blur, and it sits clear of 
   assert.ok(r.pad>=18,'header top padding beyond the inset: '+r.pad);
   await ctx.close();
 });
+
+test('the release workflow reads the same version the app shows in Settings',async()=>{
+  const wf=fs.readFileSync(path.join(ROOT,'.github','workflows','release.yml'),'utf8');
+  assert.match(wf,/branches:\s*\[main\]/);
+  assert.match(wf,/contents:\s*write/);
+  const pat=wf.match(/grep -oP "([^"]+)" split\.js/);
+  assert.ok(pat,'workflow greps split.js for the version');
+  const {execFileSync}=require('node:child_process');
+  const v=execFileSync('grep',['-oP',pat[1],path.join(ROOT,'split.js')],{encoding:'utf8'}).trim();
+  const shown=fs.readFileSync(path.join(ROOT,'split.js'),'utf8').match(/const BUILD='([^']+)'/)[1];
+  assert.equal(v,shown);
+  assert.match(v,/^\d{4}-\d{2}-\d{2}\.\d{6}$/);
+});
