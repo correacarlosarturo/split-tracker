@@ -59,7 +59,7 @@ async function openApp({ls={},gh,hash='log'}={}){
   const page=await ctx.newPage();
   page.on('pageerror',e=>errors.push(e.message));
   await page.goto(base+'#'+hash);
-  await page.waitForSelector('#tab-log section');
+  await page.waitForSelector('#tab-'+hash+' section');
   return {ctx,page,errors};
 }
 const waitSync=page=>page.waitForFunction(()=>/synced|sync problem/.test(document.querySelector('#sync').textContent),null,{timeout:10000});
@@ -166,5 +166,30 @@ test('IndexedDB copy wins when it is newer than localStorage',async()=>{
   await page.evaluate(async v=>{await new Promise((res,rej)=>{const r=indexedDB.open('split',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>{const t=r.result.transaction('kv','readwrite');t.objectStore('kv').put(JSON.stringify({at:Date.now(),s:v}),'sessions');t.oncomplete=res;t.onerror=rej;};});},{[d]:doc});
   await page.reload();
   await page.waitForFunction(k=>{const s=JSON.parse(localStorage.getItem('split-sessions-v2')||'{}');return !!s[k];},d);
+  await ctx.close();
+});
+
+test('stats default to this week for activity and 1M for body weight',async()=>{
+  const {ctx,page}=await openApp({hash:'stats'});
+  assert.equal(await page.textContent('[data-ar].on'),'Week');
+  assert.equal(await page.textContent('[data-wr].on'),'1M');
+  assert.match(await page.textContent('.actsum'),/this week/);
+  await ctx.close();
+});
+
+test('Month activity is the calendar month, not the last 30 days',async()=>{
+  const t=today(),first=t.slice(0,8)+'01';
+  const prev=new Date(first+'T12:00:00');prev.setDate(0);const z=n=>String(n).padStart(2,'0');
+  const lastOfPrev=prev.getFullYear()+'-'+z(prev.getMonth()+1)+'-'+z(prev.getDate());
+  const s=(date)=>({date,day:'D1',savedAt:new Date().toISOString(),entries:{'d1-lat':{sets:[{kg:50,reps:10}]}}});
+  const {ctx,page,errors}=await openApp({hash:'stats',ls:{'split-sessions-v2':{[first]:s(first),[lastOfPrev]:s(lastOfPrev)}}});
+  await page.click('[data-ar="Month"]');
+  const monthName=new Date(first+'T12:00:00').toLocaleString('en',{month:'long'});
+  assert.match(await page.textContent('.actsum'),new RegExp('^1 workout · .* in '+monthName+'$'));
+  // every day of the month is shown, days from other months are blank
+  const nums=await page.$$eval('.cal .cd',els=>els.map(e=>e.childNodes[0]&&e.childNodes[0].nodeType===3?Number(e.childNodes[0].textContent):null).filter(n=>n));
+  const daysInMonth=new Date(Number(first.slice(0,4)),Number(first.slice(5,7)),0).getDate();
+  assert.deepEqual(nums,Array.from({length:daysInMonth},(_,i)=>i+1));
+  assert.deepEqual(errors,[]);
   await ctx.close();
 });
