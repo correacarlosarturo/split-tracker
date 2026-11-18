@@ -419,3 +419,12 @@ test('the background runs under the iPhone status bar',async()=>{
   assert.notEqual(band.light.img,band.dark.img,'light strip carries the accent shade');
 });
 
+
+test('nothing in the header is drawn with filters or blur, and it sits clear of the clock',async()=>{
+  const {ctx,page}=await openApp({hash:'stats',ls:theme('dark')});
+  const r=await page.evaluate(()=>{const fx=[...document.querySelectorAll('header, header *')].map(e=>{const s=getComputedStyle(e);return [s.filter,s.backdropFilter||s.webkitBackdropFilter||'none',s.willChange,s.transform];}).filter(v=>v[0]!=='none'||v[1]!=='none'||v[2]!=='auto'||v[3]!=='none');
+    return {fx,pad:parseFloat(getComputedStyle(document.querySelector('header')).paddingTop)};});
+  assert.deepEqual(r.fx,[],'no filter/backdrop/will-change/transform in the header');
+  assert.ok(r.pad>=18,'header top padding beyond the inset: '+r.pad);
+  await ctx.close();
+});
