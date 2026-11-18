@@ -80,7 +80,7 @@ let sampleCache=null;
 const LS_CO='split-coach-v1',LS_CS='split-coach-shas-v1';
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS_S='split-sessions-v2',LS_SA='split-sessions-at-v1',LS_Q='split-queue-v1',LS_C='split-sync-cfg-v1',LS_H='split-shas-v1',LS_L='split-lastsync-v1';
-const BUILD='2026-11-18.132731';
+const BUILD='2026-11-18.133807';
 const DATE_RE=/^\d{4}-\d{2}-\d{2}$/,FILE_RE=/^\d{4}-\d{2}-\d{2}\.json$/,REPO_RE=/^[\w.-]+\/[\w.-]+$/;
 const dayOf=id=>DAYS.find(x=>x.id===id)||null;
 const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
@@ -694,12 +694,15 @@ window.addEventListener('pagehide',()=>{if(state.dirty)autoSave();});
 window.addEventListener('focus',rollover);
 window.addEventListener('online',()=>schedSync(500));
 document.addEventListener('visibilitychange',()=>{if(document.hidden){if(Object.keys(queueGet()).length)schedSync(0);}else schedSync(500);});
-/* Keep a focused field clear of the pinned header and the floating tab bar. iOS only scrolls a field into
-   the viewport when the keyboard opens, which can leave it underneath the header. */
+/* Keep a focused field clear of the status-bar strip and the floating tab bar. iOS only scrolls a field into
+   the viewport when the keyboard opens, which can leave it underneath the clock. */
 function keepClear(t){
-  const h=$('header'),n=$('.nav'),r=t.getBoundingClientRect(),top=h?h.getBoundingClientRect().bottom+8:0,bot=n?n.getBoundingClientRect().top-8:innerHeight;
+  const b=$('#sb-band'),n=$('.nav'),r=t.getBoundingClientRect(),top=(b?b.getBoundingClientRect().bottom:0)+8,bot=n?n.getBoundingClientRect().top-8:innerHeight;
   if(r.top<top)window.scrollBy(0,r.top-top);else if(r.bottom>bot&&r.height<bot-top)window.scrollBy(0,r.bottom-bot);
 }
+/* dark modes fade the status-bar strip in once the page has scrolled */
+const markScrolled=()=>document.documentElement.classList.toggle('scrolled',scrollY>8);
+window.addEventListener('scroll',markScrolled,{passive:true});markScrolled();
 document.addEventListener('focusin',e=>{const t=e.target;if(!t.matches||!t.matches('input,textarea,select')||t.closest('dialog'))return;[60,350].forEach(ms=>setTimeout(()=>{if(document.activeElement===t)keepClear(t);},ms));});
 /* ---------- themes ---------- */
 const LS_TH='split-theme-v1';
