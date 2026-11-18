@@ -8,9 +8,9 @@
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Split"><meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Split"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="theme-color" id="tc" content="#faf9f5">
-<script src="theme.js?v=2026-11-18.132029"></script>
+<script src="theme.js?v=2026-11-18.132731"></script>
 <style>
 /* Layout: one narrow column, sticky header, bottom tab bar. Palette: graphite with indigo accent; heat uses its own red-to-green scale. */
 /* Look: warm paper, clay accent, serif display + system sans, quiet hairline cards (follows the iPhone light/dark setting) */
@@ -402,6 +402,9 @@ header .brand h1{font:700 21px var(--sans);letter-spacing:-.02em;color:var(--ink
 #gear #sync[data-s="synced"]{background:var(--good)}#gear #sync[data-s="error"]{background:var(--bad)}
 .glassrow{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
 .glassrow input{flex:1;min-width:0;accent-color:var(--accent);height:32px}
+/* the page runs under the iPhone status bar (black-translucent). iOS then always draws the clock and battery in
+   white, so light mode gets a soft accent shade behind them; dark modes need none. Zero height off iPhone. */
+html[data-scheme="light"] header::before{content:"";position:absolute;inset:0 0 auto;height:calc(env(safe-area-inset-top,0px) + 6px);background:linear-gradient(to bottom,color-mix(in srgb,var(--accent) 88%,transparent),color-mix(in srgb,var(--accent) 60%,transparent) 70%,transparent);pointer-events:none}
 /* no backdrop-filter support: bars go near-opaque so text under them stays readable */
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   html,html[data-scheme="light"]{--glass-bar:rgba(246,247,250,.96);--glass-sheet:rgba(246,247,250,.97)}
@@ -448,6 +451,6 @@ html[data-contrast="high"] body::before{display:none}
 <button data-tab="coach"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h12M8 12h12M8 17h12M4 7h.01M4 12h.01M4 17h.01"/></svg>Coach</button>
 </div></nav>
 <div id="toast" role="status" aria-live="polite"></div>
-<script src="split.js?v=2026-11-18.132029"></script>
+<script src="split.js?v=2026-11-18.132731"></script>
 </body>
 </html>

@@ -389,3 +389,17 @@ test('the glass slider sets how clear the bars are, and is remembered',async()=>
   assert.equal(await page.$eval('#th-glass',el=>el.value),'10');
   await ctx.close();
 });
+
+test('the background runs under the iPhone status bar',async()=>{
+  const html=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
+  assert.match(html,/<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">/);
+  assert.match(html,/viewport-fit=cover/);
+  // the status bar text is always white with black-translucent: light mode gets a shade behind it, dark modes do not
+  const shade={};
+  for(const mode of ['light','dark','black']){
+    const {ctx,page}=await openApp({hash:'stats',ls:theme(mode)});
+    shade[mode]=await page.$eval('header',h=>getComputedStyle(h,'::before').content!=='none'&&getComputedStyle(h,'::before').display!=='none');
+    await ctx.close();
+  }
+  assert.deepEqual(shade,{light:true,dark:false,black:false});
+});
