@@ -412,7 +412,7 @@ test('nothing in the header is drawn with filters or blur',async()=>{
   const r=await page.evaluate(()=>{const fx=[...document.querySelectorAll('header, header *')].map(e=>{const s=getComputedStyle(e);return [s.filter,s.backdropFilter||s.webkitBackdropFilter||'none',s.willChange,s.transform];}).filter(v=>v[0]!=='none'||v[1]!=='none'||v[2]!=='auto'||v[3]!=='none');
     return {fx,pad:parseFloat(getComputedStyle(document.querySelector('header')).paddingTop)};});
   assert.deepEqual(r.fx,[],'no filter/backdrop/will-change/transform in the header');
-  assert.ok(r.pad>=10&&r.pad<=20,'header top padding '+r.pad);
+  assert.ok(r.pad>=26&&r.pad<=32,'header top padding '+r.pad+' (iOS blurs ~21px below the status bar)');
   await ctx.close();
 });
 
@@ -467,16 +467,13 @@ test('malformed settings in the repo are ignored',async()=>{
   await ctx.close();
 });
 
-test('settings can show a ruler for measuring the iOS top blur',async()=>{
-  const {ctx,page,errors}=await openApp({hash:'stats'});
-  await page.click('#gear');await page.click('#set-ruler');
-  assert.equal(await page.$eval('#settings',d=>d.open),false);
-  const r=await page.$eval('#ruler',el=>({top:el.getBoundingClientRect().top,hidden:el.hidden,labels:[...el.querySelectorAll('[data-y]')].map(x=>[Number(x.dataset.y),Math.round(x.getBoundingClientRect().top)])}));
-  assert.equal(r.hidden,false);assert.equal(r.top,0);
-  assert.deepEqual(r.labels.slice(0,3),[[0,0],[4,4],[8,8]]);
-  assert.equal(r.labels[r.labels.length-1][0],120);
-  await page.click('#ruler');
-  assert.equal(await page.$eval('#ruler',el=>el.hidden),true);
-  assert.deepEqual(errors,[]);
+test('the settings sheet opens below the band iOS blurs, and the ruler is gone',async()=>{
+  const {ctx,page}=await openApp({hash:'stats'});
+  await page.click('#gear');
+  const r=await page.$eval('#settings',d=>({top:d.getBoundingClientRect().top,mt:parseFloat(getComputedStyle(d).marginTop),bottom:d.getBoundingClientRect().bottom,vh:innerHeight}));
+  assert.ok(r.mt>=32,'sheet top margin '+r.mt);
+  assert.ok(Math.abs(r.top-r.mt)<1,'sheet starts at its top margin, not centred: '+JSON.stringify(r));
+  assert.ok(r.bottom<=r.vh,'sheet fits on screen');
+  assert.equal(await page.$('#set-ruler'),null);assert.equal(await page.$('#ruler'),null);
   await ctx.close();
 });

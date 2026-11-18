@@ -81,7 +81,7 @@ const LS_CO='split-coach-v1',LS_CS='split-coach-shas-v1';
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS_SAT='split-settings-at-v1',LS_SDIRTY='split-settings-dirty-v1',LS_SSHA='split-settings-sha-v1';
 const LS_S='split-sessions-v2',LS_SA='split-sessions-at-v1',LS_Q='split-queue-v1',LS_C='split-sync-cfg-v1',LS_H='split-shas-v1',LS_L='split-lastsync-v1';
-const BUILD='2026-11-18.142828';
+const BUILD='2026-11-18.143720';
 const DATE_RE=/^\d{4}-\d{2}-\d{2}$/,FILE_RE=/^\d{4}-\d{2}-\d{2}\.json$/,REPO_RE=/^[\w.-]+\/[\w.-]+$/;
 const dayOf=id=>DAYS.find(x=>x.id===id)||null;
 const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
@@ -764,10 +764,6 @@ function openSettings(){const c=cfg();$('#set-repo').value=c?c.repo:'';$('#set-t
 $('#gear').addEventListener('click',openSettings);
 $('#set-close').addEventListener('click',()=>dlg.close());
 $('#set-x').addEventListener('click',()=>dlg.close());
-/* temporary: measure how far down iOS blurs the top of the page */
-$('#set-ruler').addEventListener('click',()=>{const r=$('#ruler');let h='';for(let y=0;y<=120;y+=4)h+=`<div data-y="${y}" style="top:${y}px"><span style="left:${12+((y/4)%4)*86}px">${y}px</span></div>`;
-  r.innerHTML=h+'<p>Take a screenshot of this screen and send it over. The first number that looks sharp is the height of the blur. Tap anywhere to close.</p>';dlg.close();r.hidden=false;});
-$('#ruler').addEventListener('click',()=>{$('#ruler').hidden=true;});
 $('#set-target').addEventListener('change',e=>{const v=Number(String(e.target.value).replace(',','.'));if(v>0)lsSet(LS_T,v);else localStorage.removeItem(LS_T);settingsChanged();try{renderStats();}catch(x){}});
 $('#set-save').addEventListener('click',async()=>{
   const repo=$('#set-repo').value.trim().replace(/^https?:\/\/github\.com\//,'').replace(/\.git$/,''),old=cfg(),token=$('#set-token').value.trim()||(old&&old.token)||'',m=$('#set-msg');
