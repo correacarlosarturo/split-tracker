@@ -193,3 +193,76 @@ test('Month activity is the calendar month, not the last 30 days',async()=>{
   assert.deepEqual(errors,[]);
   await ctx.close();
 });
+
+/* ---------- Liquid Glass ---------- */
+// Resolve any CSS colour (including color-mix and custom properties) to [r,g,b,a] in 0..1 inside the page.
+async function tokenColors(page,names){
+  return page.evaluate(names=>{
+    const out={},el=document.createElement('i');document.body.appendChild(el);
+    for(const n of names){
+      el.style.color='';el.style.color='var('+n+')';
+      const c=getComputedStyle(el).color;let m;
+      if((m=c.match(/^rgba?\(([^)]+)\)/))){const p=m[1].split(/[ ,/]+/).filter(Boolean).map(Number);out[n]=[p[0]/255,p[1]/255,p[2]/255,p.length>3?p[3]:1];}
+      else if((m=c.match(/^color\(srgb ([^)]+)\)/))){const p=m[1].split(/[ /]+/).filter(Boolean).map(Number);out[n]=[p[0],p[1],p[2],p.length>3?p[3]:1];}
+      else out[n]=null;
+    }
+    el.remove();return out;
+  },names);
+}
+const over=(top,bot)=>{const a=top[3]+bot[3]*(1-top[3]);return [0,1,2].map(i=>(top[i]*top[3]+bot[i]*bot[3]*(1-top[3]))/a).concat([a]);};
+const lum=c=>{const f=v=>v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4);return .2126*f(c[0])+.7152*f(c[1])+.0722*f(c[2]);};
+const contrast=(a,b)=>{const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+const theme=(mode,extra={})=>({'split-theme-v1':Object.assign({mode,accent:'clay',contrast:'normal'},extra)});
+
+test('glass: wash sits behind the page and bars blur, cards do not',async()=>{
+  const {ctx,page}=await openApp({hash:'stats',ls:theme('light')});
+  const r=await page.evaluate(()=>{const bf=e=>{const s=getComputedStyle(e);return s.backdropFilter||s.webkitBackdropFilter||'none';};
+    return {wash:getComputedStyle(document.body,'::before').position,header:bf(document.querySelector('header')),nav:bf(document.querySelector('.nav')),card:bf(document.querySelector('.card')),radius:getComputedStyle(document.querySelector('.card')).borderRadius};});
+  assert.equal(r.wash,'fixed');
+  assert.match(r.header,/blur/);assert.match(r.nav,/blur/);
+  assert.equal(r.card,'none');
+  assert.equal(r.radius,'22px');
+  await ctx.close();
+});
+
+test('glass: text contrast holds in light, dark and black',async()=>{
+  for(const mode of ['light','dark','black']){
+    const {ctx,page}=await openApp({hash:'stats',ls:theme(mode)});
+    const c=await tokenColors(page,['--bg','--ink','--muted','--glass','--wash-1','--wash-2','--wash-3']);
+    for(const k in c)assert.ok(c[k],mode+' '+k+' resolves to a colour');
+    for(const w of [null,c['--wash-1'],c['--wash-2'],c['--wash-3']]){
+      const ground=w?over(w,c['--bg']):c['--bg'],surf=over(c['--glass'],ground);
+      for(const ink of ['--ink','--muted']){
+        const r=contrast(c[ink],surf);
+        assert.ok(r>=4.5,`${mode}: ${ink} on glass over ${w?'wash':'bg'} is ${r.toFixed(2)}:1`);
+      }
+    }
+    await ctx.close();
+  }
+});
+
+test('glass: black mode keeps a black background',async()=>{
+  const {ctx,page}=await openApp({hash:'stats',ls:theme('black')});
+  const c=await tokenColors(page,['--bg']);
+  assert.deepEqual(c['--bg'].slice(0,3).map(v=>Math.round(v*255)),[0,0,0]);
+  await ctx.close();
+});
+
+test('glass: high contrast is solid',async()=>{
+  for(const mode of ['light','dark']){
+    const {ctx,page}=await openApp({hash:'stats',ls:theme(mode,{contrast:'high'})});
+    const r=await page.evaluate(()=>{const bf=e=>{const s=getComputedStyle(e);return s.backdropFilter||s.webkitBackdropFilter||'none';};return [bf(document.querySelector('header')),bf(document.querySelector('.nav'))];});
+    assert.deepEqual(r,['none','none'],mode);
+    const c=await tokenColors(page,['--glass','--glass-bar']);
+    assert.equal(c['--glass'][3],1,mode+' --glass opaque');assert.equal(c['--glass-bar'][3],1,mode+' --glass-bar opaque');
+    await ctx.close();
+  }
+});
+
+test('glass: falls back when backdrop-filter is unsupported',async()=>{
+  const html=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
+  const m=html.match(/@supports not \(\(backdrop-filter:\s*blur\(1px\)\) or \(-webkit-backdrop-filter:\s*blur\(1px\)\)\)\s*\{([\s\S]*?)\}\s*\}/);
+  assert.ok(m,'fallback block present');
+  const a=m[1].match(/--glass-bar:\s*rgba\([^)]*,\s*([\d.]+)\)/);
+  assert.ok(a&&Number(a[1])>=.92,'--glass-bar alpha >= .92');
+});
