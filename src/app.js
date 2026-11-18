@@ -15,7 +15,7 @@ const num=v=>{const x=parseFloat(String(v).replace(',','.'));return isFinite(x)?
 const fmtKg=x=>(Math.round(x*100)/100).toString();
 const exById=id=>EX.find(e=>e.id===id);
 
-const state={sessions:{},real:false,tab:'stats',date:todayStr(),draft:null,dirty:false,wr:'3M',ar:'6M',sel:null,sync:'connecting',confirmDel:false};
+const state={sessions:{},real:false,tab:'stats',date:todayStr(),draft:null,dirty:false,wr:'1M',ar:'Week',sel:null,sync:'connecting',confirmDel:false};
 let sampleCache=null;
 /* ---------- local-first data layer + GitHub sync ---------- */
 const LS_CO='split-coach-v1',LS_CS='split-coach-shas-v1';
@@ -437,18 +437,24 @@ function weekStreak(){
 }
 const AR={'Week':1,'Month':5,'Quarter':13,'6M':26,'Year':53};
 function activityHtml(){
-  const today=todayStr(),W=AR[state.ar]||26,start=addDays(mondayOf(today),-(W-1)*7);
+  const today=todayStr(),isMonth=state.ar==='Month';
+  /* Month is the calendar month (1st to last day), the others are rolling windows of whole weeks */
+  const monthStart=today.slice(0,8)+'01',monthEnd=addDays(addDays(monthStart,32).slice(0,8)+'01',-1);
+  const W=isMonth?Math.ceil((Math.round((dayMs(monthEnd)-dayMs(mondayOf(monthStart)))/864e5)+1)/7):(AR[state.ar]||1);
+  const start=isMonth?mondayOf(monthStart):addDays(mondayOf(today),-(W-1)*7),from=isMonth?monthStart:start;
   const tot={};realList().forEach(s=>{const e=effort(s);tot[s.date]=Object.keys(e).reduce((x,m)=>x+e[m],0);});
-  const inR=Object.keys(tot).filter(d=>d>=start&&d<=today);
-  const sum=`<p class="sub actsum">${inR.length} workout${inR.length===1?'':'s'} · ${Math.round(inR.reduce((x,d)=>x+tot[d],0))} effective sets in this period</p>`;
+  const inR=Object.keys(tot).filter(d=>d>=from&&d<=today);
+  const period=isMonth?'in '+new Date(monthStart+'T12:00:00').toLocaleString('en',{month:'long'}):state.ar==='Week'?'this week':'in this period';
+  const sum=`<p class="sub actsum">${inR.length} workout${inR.length===1?'':'s'} · ${Math.round(inR.reduce((x,d)=>x+tot[d],0))} effective sets ${period}</p>`;
   const lvl=v=>v<=0?0:v<8?1:v<14?2:v<20?3:4;
   const seg=`<div class="seg" role="group" aria-label="Activity period">${Object.keys(AR).map(k=>`<button data-ar="${k}" class="${state.ar===k?'on':''}">${k}</button>`).join('')}</div>`;
   const legend='<div class="scale"><span>Less</span><i class="cell l0"></i><i class="cell l1"></i><i class="cell l2"></i><i class="cell l3"></i><i class="cell l4"></i><span>More</span></div>';
-  if(W<=5){
+  if(isMonth||state.ar==='Week'){
     let c='<div class="cal">'+['Mo','Tu','We','Th','Fr','Sa','Su'].map(x=>`<b>${x}</b>`).join('');
     for(let r=0;r<W;r++)for(let k=0;k<7;k++){
       const d=addDays(start,r*7+k);
-      if(d>today){c+='<i class="cd fut"></i>';continue;}
+      if(isMonth&&d.slice(0,7)!==monthStart.slice(0,7)){c+='<i class="cd fut"></i>';continue;}
+      if(d>today){c+=`<i class="cd fut">${isMonth?Number(d.slice(8)):''}</i>`;continue;}
       const v=tot[d]||0;
       c+=`<i class="cd l${lvl(v)}${d===today?' today':''}" title="${d}${v?' · '+v.toFixed(0)+' sets':''}">${Number(d.slice(8))}${v?`<small>${Math.round(v)}</small>`:''}</i>`;
     }
