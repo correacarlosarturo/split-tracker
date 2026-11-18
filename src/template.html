@@ -329,12 +329,14 @@ html,html[data-scheme="light"]{--disp:var(--sans);--radius-card:22px;--radius-pi
   --bg:#eceef4;--surface:#fff;--ink:#121216;--muted:#4a4a53;--line:rgba(20,20,45,.10);--inset:rgba(255,255,255,.55);
   --glass:rgba(255,255,255,.52);--glass-bar:rgba(255,255,255,.66);--glass-edge:rgba(255,255,255,.78);--glass-hi:rgba(255,255,255,.95);--glass-sel:rgba(255,255,255,.72);--glass-shade:rgba(28,30,60,.10);
   --wash-1:color-mix(in srgb,var(--acc,#c4573a) 40%,transparent);--wash-2:color-mix(in srgb,var(--acc-clay,#c96442) 26%,transparent);--wash-3:color-mix(in srgb,color-mix(in srgb,var(--acc,#c4573a) 55%,#fff) 45%,transparent);
-  --idle:rgba(20,20,45,.07);--body:rgba(20,20,45,.10);--blur:blur(24px) saturate(180%)}
-html[data-scheme="dark"]{--bg:#101116;--surface:#1c1d24;--ink:#f3f3f6;--muted:#b4b4be;--line:rgba(255,255,255,.10);--inset:rgba(255,255,255,.07);
+  --idle:rgba(20,20,45,.07);--body:rgba(20,20,45,.10);--blur:blur(24px) saturate(180%);
+  /* accent and warning text darkened a step so they keep 4.5:1 on light glass */
+  --accent:color-mix(in srgb,var(--acc,#c4573a) 80%,#000);--warn:#7a5008}
+html[data-scheme="dark"]{--bg:#101116;--accent:color-mix(in srgb,var(--acc,#d97757) 78%,#fff);--surface:#1c1d24;--ink:#f3f3f6;--muted:#b4b4be;--line:rgba(255,255,255,.10);--inset:rgba(255,255,255,.07);
   --glass:rgba(38,39,50,.48);--glass-bar:rgba(30,31,40,.62);--glass-edge:rgba(255,255,255,.13);--glass-hi:rgba(255,255,255,.16);--glass-sel:rgba(255,255,255,.14);--glass-shade:rgba(0,0,0,.40);
   --wash-1:color-mix(in srgb,var(--acc,#d97757) 36%,transparent);--wash-2:color-mix(in srgb,var(--acc-clay,#d97757) 24%,transparent);--wash-3:color-mix(in srgb,var(--acc-soft,#4a362d) 70%,transparent);
   --idle:rgba(255,255,255,.08);--body:rgba(255,255,255,.10)}
-html[data-scheme="black"]{--bg:#000;--surface:#0e0e10;--ink:#f3f3f6;--muted:#a6a6b0;--line:rgba(255,255,255,.10);--inset:rgba(255,255,255,.07);
+html[data-scheme="black"]{--bg:#000;--accent:color-mix(in srgb,var(--acc,#d97757) 78%,#fff);--surface:#0e0e10;--ink:#f3f3f6;--muted:#a6a6b0;--line:rgba(255,255,255,.10);--inset:rgba(255,255,255,.07);
   --glass:rgba(26,26,30,.58);--glass-bar:rgba(18,18,22,.70);--glass-edge:rgba(255,255,255,.11);--glass-hi:rgba(255,255,255,.12);--glass-sel:rgba(255,255,255,.13);--glass-shade:rgba(0,0,0,.6);
   --wash-1:color-mix(in srgb,var(--acc,#d97757) 44%,transparent);--wash-2:color-mix(in srgb,var(--acc-clay,#d97757) 32%,transparent);--wash-3:color-mix(in srgb,var(--acc-soft,#4a362d) 80%,transparent);
   --idle:rgba(255,255,255,.08);--body:rgba(255,255,255,.10)}
@@ -381,11 +383,13 @@ dialog#settings::backdrop{background:rgba(0,0,0,.30)}
 .alt img{border-radius:14px;border:1px solid var(--glass-edge)}
 .nlb{display:grid;grid-template-columns:132px 1fr;gap:14px;align-items:center}
 .nlb .fx{max-width:132px;margin:0}
+.nlb:not(:has(.fx)){grid-template-columns:1fr}
 .nli b{font:700 19px var(--sans);letter-spacing:-.01em}.nli .sub{margin:2px 0 6px;font-size:14px}.nli .tgt{margin:0 0 6px;font-size:15px}.nli .cue{margin:0;font-size:13.5px;color:var(--muted)}
 /* no backdrop-filter support: bars go near-opaque so text under them stays readable */
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
-  html{--glass-bar:rgba(246,247,250,.96)}
-  html[data-scheme="dark"],html[data-scheme="black"]{--glass-bar:rgba(22,23,30,.96)}
+  html,html[data-scheme="light"]{--glass-bar:rgba(246,247,250,.96)}
+  html[data-scheme="dark"]{--glass-bar:rgba(22,23,30,.96)}
+  html[data-scheme="black"]{--glass-bar:rgba(6,6,8,.96)}
 }
 /* high contrast: solid surfaces, no translucency, no blur, no wash */
 html[data-contrast="high"]{--glass:var(--surface);--glass-bar:var(--surface);--glass-sel:var(--inset);--glass-edge:var(--line);--glass-hi:transparent;--inset:var(--bg)}

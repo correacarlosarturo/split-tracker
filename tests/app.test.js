@@ -229,11 +229,11 @@ test('glass: wash sits behind the page and bars blur, cards do not',async()=>{
 test('glass: text contrast holds in light, dark and black',{timeout:120000},async()=>{
   for(const mode of ['light','dark','black'])for(const accent of ['clay','ocean','forest','violet','graphite']){
     const {ctx,page}=await openApp({hash:'stats',ls:theme(mode,{accent})});
-    const c=await tokenColors(page,['--bg','--ink','--muted','--glass','--wash-1','--wash-2','--wash-3']);
+    const c=await tokenColors(page,['--bg','--ink','--muted','--accent','--warn','--glass','--wash-1','--wash-2','--wash-3']);
     for(const k in c)assert.ok(c[k],mode+' '+k+' resolves to a colour');
     for(const w of [null,c['--wash-1'],c['--wash-2'],c['--wash-3']]){
       const ground=w?over(w,c['--bg']):c['--bg'],surf=over(c['--glass'],ground);
-      for(const ink of ['--ink','--muted']){
+      for(const ink of ['--ink','--muted','--accent','--warn']){
         const r=contrast(c[ink],surf);
         assert.ok(r>=4.5,`${mode}/${accent}: ${ink} on glass over ${w?'wash':'bg'} is ${r.toFixed(2)}:1`);
       }
@@ -315,4 +315,28 @@ test('readme renders exist and are framed phones',{timeout:180000},async()=>{
   assert.deepEqual(size('hero.png'),[1600,900]);
   for(const f of ['stats.png','log.png','coach.png','dark.png'])assert.deepEqual(size(f),[900,1500],f);
   fs.rmSync(out,{recursive:true,force:true});
+});
+
+test('glass: the no-blur fallback makes bars near-opaque in every mode',async()=>{
+  const html=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
+  const m=html.match(/@supports not \(\(backdrop-filter:\s*blur\(1px\)\) or \(-webkit-backdrop-filter:\s*blur\(1px\)\)\)\s*\{([\s\S]*?\})\s*\}/);
+  assert.ok(m,'fallback block present');
+  for(const mode of ['light','dark','black']){
+    const {ctx,page}=await openApp({hash:'stats',ls:theme(mode)});
+    await page.addStyleTag({content:m[1]}); // apply the fallback as an unsupporting browser would
+    const c=await tokenColors(page,['--glass-bar']);
+    assert.ok(c['--glass-bar'][3]>=.92,mode+' --glass-bar alpha '+c['--glass-bar'][3]);
+    if(mode==='black')assert.ok(c['--glass-bar'].slice(0,3).every(v=>v<.05),'black fallback stays black');
+    await ctx.close();
+  }
+});
+
+test('the preview keeps full width when the lift has no image',async()=>{
+  const before=ctx=>ctx.route('**/split.js*',async route=>{
+    const r=await route.fetch();await route.fulfill({response:r,body:(await r.text()).replace('"d1-lat":"lat-pulldown",','')});
+  });
+  const {ctx,page}=await openApp({hash:'stats',before});
+  const w=await page.$eval('.nextlift',c=>({card:c.getBoundingClientRect().width,info:c.querySelector('.nli').getBoundingClientRect().width}));
+  assert.ok(w.info>w.card*.8,`info column ${w.info}px of ${w.card}px card`);
+  await ctx.close();
 });
