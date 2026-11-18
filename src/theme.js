@@ -1,0 +1,2 @@
+/* Applies the saved theme before first paint, so the page never flashes the wrong colours. */
+(function(){try{var T=JSON.parse(localStorage.getItem("split-theme-v1")||"{}"),m=T.mode||"auto",d=document.documentElement,s=m==="auto"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;d.dataset.scheme=s;d.dataset.accent=T.accent||"clay";d.dataset.contrast=T.contrast||"normal";}catch(e){var d=document.documentElement;d.dataset.scheme=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";d.dataset.accent="clay";d.dataset.contrast="normal";}})();
