@@ -297,3 +297,14 @@ test('the preview survives a lift without images',async()=>{
   assert.deepEqual(errors,[]);
   await ctx.close();
 });
+
+test('readme renders exist and are framed phones',{timeout:180000},async()=>{
+  const {spawnSync}=require('node:child_process'),os=require('node:os');
+  const out=fs.mkdtempSync(path.join(os.tmpdir(),'shots-'));
+  const r=spawnSync(process.execPath,[path.join(ROOT,'tools','readme-shots.js'),out],{encoding:'utf8',timeout:170000});
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  const size=f=>{const b=fs.readFileSync(path.join(out,f));assert.equal(b.toString('ascii',1,4),'PNG',f);return [b.readUInt32BE(16),b.readUInt32BE(20)];};
+  assert.deepEqual(size('hero.png'),[1600,900]);
+  for(const f of ['stats.png','log.png','coach.png','dark.png'])assert.deepEqual(size(f),[900,1500],f);
+  fs.rmSync(out,{recursive:true,force:true});
+});
