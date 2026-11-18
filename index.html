@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Split"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" id="tc" content="#faf9f5">
-<script src="theme.js?v=2026-11-18.130212"></script>
+<script src="theme.js?v=2026-11-18.132029"></script>
 <style>
 /* Layout: one narrow column, sticky header, bottom tab bar. Palette: graphite with indigo accent; heat uses its own red-to-green scale. */
 /* Look: warm paper, clay accent, serif display + system sans, quiet hairline cards (follows the iPhone light/dark setting) */
@@ -327,17 +327,17 @@ header .in h1{flex:none;white-space:nowrap}header .in #sync{flex:1 1 auto;min-wi
    used only where content scrolls underneath: the header, the tab bar, the settings sheet and the toast. */
 html,html[data-scheme="light"]{--disp:var(--sans);--radius-card:22px;--radius-pill:999px;
   --bg:#eceef4;--surface:#fff;--ink:#121216;--muted:#4a4a53;--line:rgba(20,20,45,.10);--inset:rgba(255,255,255,.55);
-  --glass:rgba(255,255,255,.52);--glass-bar:rgba(255,255,255,.66);--glass-edge:rgba(255,255,255,.78);--glass-hi:rgba(255,255,255,.95);--glass-sel:rgba(255,255,255,.72);--glass-shade:rgba(28,30,60,.10);
+  --glass:rgba(255,255,255,.52);--glass-bar:rgb(255 255 255 / calc(.14 + .76*var(--tint,.5)));--glass-sheet:rgba(255,255,255,.66);--glass-edge:rgba(255,255,255,.78);--glass-hi:rgba(255,255,255,.95);--glass-sel:rgba(255,255,255,.72);--glass-shade:rgba(28,30,60,.10);
   --wash-1:color-mix(in srgb,var(--acc,#c4573a) 40%,transparent);--wash-2:color-mix(in srgb,var(--acc-clay,#c96442) 26%,transparent);--wash-3:color-mix(in srgb,color-mix(in srgb,var(--acc,#c4573a) 55%,#fff) 45%,transparent);
   --idle:rgba(20,20,45,.07);--body:rgba(20,20,45,.10);--blur:blur(24px) saturate(180%);
   /* accent and warning text darkened a step so they keep 4.5:1 on light glass */
   --accent:color-mix(in srgb,var(--acc,#c4573a) 80%,#000);--warn:#7a5008}
 html[data-scheme="dark"]{--bg:#101116;--accent:color-mix(in srgb,var(--acc,#d97757) 78%,#fff);--surface:#1c1d24;--ink:#f3f3f6;--muted:#b4b4be;--line:rgba(255,255,255,.10);--inset:rgba(255,255,255,.07);
-  --glass:rgba(38,39,50,.48);--glass-bar:rgba(30,31,40,.62);--glass-edge:rgba(255,255,255,.13);--glass-hi:rgba(255,255,255,.16);--glass-sel:rgba(255,255,255,.14);--glass-shade:rgba(0,0,0,.40);
+  --glass:rgba(38,39,50,.48);--glass-bar:rgb(30 31 40 / calc(.2 + .7*var(--tint,.5)));--glass-sheet:rgba(30,31,40,.62);--glass-edge:rgba(255,255,255,.13);--glass-hi:rgba(255,255,255,.16);--glass-sel:rgba(255,255,255,.14);--glass-shade:rgba(0,0,0,.40);
   --wash-1:color-mix(in srgb,var(--acc,#d97757) 36%,transparent);--wash-2:color-mix(in srgb,var(--acc-clay,#d97757) 24%,transparent);--wash-3:color-mix(in srgb,var(--acc-soft,#4a362d) 70%,transparent);
   --idle:rgba(255,255,255,.08);--body:rgba(255,255,255,.10)}
 html[data-scheme="black"]{--bg:#000;--accent:color-mix(in srgb,var(--acc,#d97757) 78%,#fff);--surface:#0e0e10;--ink:#f3f3f6;--muted:#a6a6b0;--line:rgba(255,255,255,.10);--inset:rgba(255,255,255,.07);
-  --glass:rgba(26,26,30,.58);--glass-bar:rgba(18,18,22,.70);--glass-edge:rgba(255,255,255,.11);--glass-hi:rgba(255,255,255,.12);--glass-sel:rgba(255,255,255,.13);--glass-shade:rgba(0,0,0,.6);
+  --glass:rgba(26,26,30,.58);--glass-bar:rgb(18 18 22 / calc(.22 + .7*var(--tint,.5)));--glass-sheet:rgba(18,18,22,.70);--glass-edge:rgba(255,255,255,.11);--glass-hi:rgba(255,255,255,.12);--glass-sel:rgba(255,255,255,.13);--glass-shade:rgba(0,0,0,.6);
   --wash-1:color-mix(in srgb,var(--acc,#d97757) 44%,transparent);--wash-2:color-mix(in srgb,var(--acc-clay,#d97757) 32%,transparent);--wash-3:color-mix(in srgb,var(--acc-soft,#4a362d) 80%,transparent);
   --idle:rgba(255,255,255,.08);--body:rgba(255,255,255,.10)}
 body{background:var(--bg)}
@@ -370,7 +370,7 @@ input:focus,textarea:focus{border-color:var(--accent)}
 .daybtn.on{background:var(--accent);border-color:transparent}
 .tag{border-color:var(--glass-edge);background:var(--inset)}
 .vb,.mc{background:var(--inset)}
-dialog#settings{background:var(--glass-bar);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--glass-edge);border-radius:28px;box-shadow:inset 0 1px 0 var(--glass-hi),0 20px 60px var(--glass-shade)}
+dialog#settings{background:var(--glass-sheet);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--glass-edge);border-radius:28px;box-shadow:inset 0 1px 0 var(--glass-hi),0 20px 60px var(--glass-shade)}
 dialog#settings::backdrop{background:rgba(0,0,0,.30)}
 #settings h2{font:700 24px var(--sans)}
 #settings input[type=text],#settings input[type=password]{background:var(--inset);border:1px solid var(--glass-edge)}
@@ -382,7 +382,7 @@ dialog#settings::backdrop{background:rgba(0,0,0,.30)}
 .fx{border-radius:var(--radius-card);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-hi),0 6px 18px var(--glass-shade);background:var(--inset)}
 .alt img{border-radius:14px;border:1px solid var(--glass-edge)}
 /* settings: close button pinned to the top right while the sheet scrolls */
-#set-x{position:sticky;top:0;float:right;margin:-8px -8px 0 8px;width:44px;height:44px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--glass-edge);background:var(--inset);color:var(--ink);cursor:pointer;z-index:1}
+#set-x{position:sticky;top:0;float:right;margin:-8px -8px 0 8px;width:44px;height:44px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;border:1px solid var(--glass-edge);background:var(--surface);color:var(--ink);cursor:pointer;z-index:1;box-shadow:0 4px 14px var(--glass-shade)}
 /* fields: room under the pinned header and above the tab bar when scrolled to */
 html{scroll-padding-top:calc(76px + env(safe-area-inset-top));scroll-padding-bottom:calc(100px + env(safe-area-inset-bottom))}
 /* date and body weight side by side: iOS draws date inputs at a fixed minimum width unless these are set */
@@ -390,20 +390,32 @@ html{scroll-padding-top:calc(76px + env(safe-area-inset-top));scroll-padding-bot
 .fld input{min-width:0;max-width:100%}
 input[type=date]{-webkit-appearance:none;appearance:none;display:block;min-width:0}
 input[type=date]::-webkit-date-and-time-value{text-align:left}
+/* header: app icon tinted with the accent, "Split", and the gear carrying the sync status as a dot */
+header .in{justify-content:space-between}
+.brand{display:flex;align-items:center;gap:9px;min-width:0}
+.appicon{width:30px;height:30px;flex:none;display:block;filter:drop-shadow(0 2px 6px var(--glass-shade))}
+.appicon .tile-bg{fill:var(--accent)}.appicon .bell rect{fill:var(--accent-ink)}
+header .brand h1{font:700 21px var(--sans);letter-spacing:-.02em;color:var(--ink)}
+#gear{position:relative;margin:-8px -10px -8px 0}
+#gear #sync{position:absolute;top:8px;right:7px;width:10px;height:10px;min-height:0;max-width:none;padding:0;border-radius:50%;background:var(--warn);border:2px solid var(--bg);font-size:0;line-height:0;color:transparent;overflow:hidden;pointer-events:none}
+#gear #sync::before{display:none}
+#gear #sync[data-s="synced"]{background:var(--good)}#gear #sync[data-s="error"]{background:var(--bad)}
+.glassrow{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
+.glassrow input{flex:1;min-width:0;accent-color:var(--accent);height:32px}
 /* no backdrop-filter support: bars go near-opaque so text under them stays readable */
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
-  html,html[data-scheme="light"]{--glass-bar:rgba(246,247,250,.96)}
-  html[data-scheme="dark"]{--glass-bar:rgba(22,23,30,.96)}
-  html[data-scheme="black"]{--glass-bar:rgba(6,6,8,.96)}
+  html,html[data-scheme="light"]{--glass-bar:rgba(246,247,250,.96);--glass-sheet:rgba(246,247,250,.97)}
+  html[data-scheme="dark"]{--glass-bar:rgba(22,23,30,.96);--glass-sheet:rgba(22,23,30,.97)}
+  html[data-scheme="black"]{--glass-bar:rgba(6,6,8,.96);--glass-sheet:rgba(6,6,8,.97)}
 }
 /* high contrast: solid surfaces, no translucency, no blur, no wash */
-html[data-contrast="high"]{--glass:var(--surface);--glass-bar:var(--surface);--glass-sel:var(--inset);--glass-edge:var(--line);--glass-hi:transparent;--inset:var(--bg)}
+html[data-contrast="high"]{--glass:var(--surface);--glass-bar:var(--surface);--glass-sheet:var(--surface);--glass-sel:var(--inset);--glass-edge:var(--line);--glass-hi:transparent;--inset:var(--bg)}
 html[data-contrast="high"] header,html[data-contrast="high"] .nav,html[data-contrast="high"] dialog#settings,html[data-contrast="high"] #toast{-webkit-backdrop-filter:none;backdrop-filter:none}
 html[data-contrast="high"] body::before{display:none}
 </style>
 </head>
 <body>
-<header><div class="in"><h1>Five-Day Split</h1><button id="sync" type="button" data-s="warn">Starting…</button><button id="gear" type="button" aria-label="Settings"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.56 1.04H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z"/></svg></button></div></header>
+<header><div class="in"><div class="brand"><svg class="appicon" viewBox="0 0 24 24" aria-hidden="true"><rect class="tile-bg" width="24" height="24" rx="5.5"/><g class="bell"><rect x="2.8" y="8.8" width="1.9" height="6.4" rx=".95"/><rect x="4.5" y="7" width="2.6" height="10" rx="1.3"/><rect x="7" y="11.1" width="10" height="1.8" rx=".9"/><rect x="16.9" y="7" width="2.6" height="10" rx="1.3"/><rect x="19.3" y="8.8" width="1.9" height="6.4" rx=".95"/></g></svg><h1>Split</h1></div><button id="gear" type="button" aria-label="Settings"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.56 1.04H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z"/></svg><span id="sync" data-s="warn">Starting…</span></button></div></header>
 <dialog id="settings"><button id="set-x" type="button" aria-label="Close settings"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button><h2>Settings</h2><p id="set-status"></p>
 <h3>Cloud sync</h3><p class="sub" style="margin:0;font-size:13px;color:var(--muted)">Your workouts always save on this phone first. Sync copies them to your private GitHub repo so Claude can read them.</p>
 <label for="set-repo">Private repo (owner/name)</label><input id="set-repo" type="text" placeholder="your-name/your-private-repo" autocapitalize="off" autocorrect="off" spellcheck="false">
@@ -417,6 +429,7 @@ html[data-contrast="high"] body::before{display:none}
 <button type="button" class="sw" data-acc="forest" aria-label="Forest" style="background:#2c7048"><span>Forest</span></button>
 <button type="button" class="sw" data-acc="violet" aria-label="Violet" style="background:#6a4cb0"><span>Violet</span></button>
 <button type="button" class="sw" data-acc="graphite" aria-label="Graphite" style="background:#3b3a37"><span>Graphite</span></button></div>
+<label for="th-glass">Glass on the tab bar and header</label><div class="glassrow"><span>Clear</span><input type="range" id="th-glass" min="0" max="100" step="5" value="50" aria-describedby="th-glass-note"><span>Tinted</span></div><p class="sub" id="th-glass-note" style="margin:2px 0 0;font-size:12.5px">Clearer shows more of the page behind the bars.</p>
 <label class="hcrow" for="th-hc"><span>High contrast (easier to read in bright light)</span><input type="checkbox" id="th-hc"></label>
 <h3>Goal</h3><label for="set-target">Target body weight, kg (stays on this phone)</label><input id="set-target" type="text" inputmode="decimal" placeholder="optional">
 <h3>Backup</h3><div class="row"><button class="btn" id="set-export" type="button">Export backup</button><label class="btn fileb" style="margin:0;color:var(--ink)">Import backup<input id="set-import" type="file" accept="application/json,.json"></label></div>
@@ -435,6 +448,6 @@ html[data-contrast="high"] body::before{display:none}
 <button data-tab="coach"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h12M8 12h12M8 17h12M4 7h.01M4 12h.01M4 17h.01"/></svg>Coach</button>
 </div></nav>
 <div id="toast" role="status" aria-live="polite"></div>
-<script src="split.js?v=2026-11-18.130212"></script>
+<script src="split.js?v=2026-11-18.132029"></script>
 </body>
 </html>

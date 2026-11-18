@@ -342,3 +342,50 @@ test('date and body weight fields never overlap on a narrow phone',async()=>{
   assert.equal(r.appearance,'none');assert.equal(r.minW,'0px');assert.equal(r.fldMinW,'0px');
   await ctx.close();
 });
+
+test('header shows the app icon and "Split", with the gear at the far end',async()=>{
+  const {ctx,page}=await openApp({hash:'stats',ls:theme('light')});
+  const r=await page.evaluate(()=>{const h=document.querySelector('header .in').getBoundingClientRect(),i=document.querySelector('header .brand svg').getBoundingClientRect(),g=document.querySelector('#gear').getBoundingClientRect();
+    return {title:document.querySelector('header h1').textContent.trim(),iconLeft:i.left-h.left,gearRight:h.right-g.right,order:i.right<=g.left};});
+  assert.equal(r.title,'Split');
+  assert.ok(r.iconLeft<4&&r.gearRight<4&&r.order,JSON.stringify(r));
+  assert.doesNotMatch(await page.textContent('header'),/Five-Day/);
+  await ctx.close();
+});
+
+test('the header icon takes the accent colour',async()=>{
+  const fills={};
+  for(const accent of ['clay','ocean']){
+    const {ctx,page}=await openApp({hash:'stats',ls:theme('light',{accent})});
+    fills[accent]=await page.evaluate(()=>{const f=getComputedStyle(document.querySelector('header .brand .tile-bg')).fill,el=document.createElement('i');el.style.color='var(--accent)';document.body.appendChild(el);const a=getComputedStyle(el).color;el.remove();return {f,a};});
+    assert.equal(fills[accent].f,fills[accent].a,accent+' icon uses --accent');
+    await ctx.close();
+  }
+  assert.notEqual(fills.clay.f,fills.ocean.f);
+});
+
+test('sync status shows as a dot on the gear and in its label',async()=>{
+  const {ctx,page,errors}=await openApp({hash:'stats'});
+  await page.waitForFunction(()=>/this phone only/.test(document.querySelector('#gear').getAttribute('aria-label')||''));
+  assert.ok(await page.$('#gear #sync[data-s]'));
+  await page.click('#gear');
+  assert.equal(await page.$eval('#settings',d=>d.open),true);
+  assert.match(await page.textContent('#set-status'),/this phone only/);
+  assert.deepEqual(errors,[]);
+  await ctx.close();
+});
+
+test('the glass slider sets how clear the bars are, and is remembered',async()=>{
+  const alpha=page=>page.evaluate(()=>{const m=getComputedStyle(document.querySelector('.nav')).backgroundColor.match(/[\d.]+/g).map(Number);return m.length>3?m[3]:1;});
+  const {ctx,page}=await openApp({hash:'stats',ls:theme('light')});
+  await page.click('#gear');
+  for(const [v,lo,hi] of [[0,0,.25],[100,.85,1]]){
+    await page.$eval('#th-glass',(el,v)=>{el.value=v;el.dispatchEvent(new Event('input',{bubbles:true}));},v);
+    const a=await alpha(page);assert.ok(a>=lo&&a<=hi,`glass ${v}: nav alpha ${a}`);
+  }
+  await page.$eval('#th-glass',el=>{el.value=10;el.dispatchEvent(new Event('input',{bubbles:true}));});
+  await page.reload();await page.waitForSelector('#tab-stats section');
+  const a=await alpha(page);assert.ok(a<.35,'remembered after reload: '+a);
+  assert.equal(await page.$eval('#th-glass',el=>el.value),'10');
+  await ctx.close();
+});

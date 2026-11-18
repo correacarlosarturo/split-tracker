@@ -67,7 +67,7 @@ If your data repo has `coach/YYYY-MM-DD.json`, the Log tab shows its note for th
 
 ### Looks right in the gym
 
-Liquid Glass styling in Auto, Light, Dark or Black mode, with five accent colours. The background is a soft gradient in whichever accent you pick. High contrast turns the glass solid for bright gyms.
+Liquid Glass styling in Auto, Light, Dark or Black mode, with five accent colours. The background is a soft gradient in whichever accent you pick. A Glass slider in Settings sets how clear the tab bar and header are, and High contrast turns the glass solid for bright gyms.
 
 </td>
 <td width="44%"><img src="docs/screenshots/dark.png" alt="The Stats tab in dark mode with the Ocean accent"></td>
@@ -78,7 +78,7 @@ Liquid Glass styling in Auto, Light, Dark or Black mode, with five accent colour
 
 1. Open the app's GitHub Pages address in Safari.
 2. Tap Share, then **Add to Home Screen**.
-3. Open it from the new icon. Tap the status text at the top to open Settings.
+3. Open it from the new icon. Tap the gear at the top right to open Settings. The dot on the gear shows sync status: green synced, amber waiting, red a problem.
 
 ## Turn on cloud sync (optional)
 
@@ -89,7 +89,7 @@ Your workouts always save on the phone first. Sync adds a second copy in a priva
    - Repository access: only that private repo.
    - Permissions: Contents → Read and write.
    - Expiry: 90 days.
-3. In the app: tap the status text, enter `your-name/your-repo` and the token, then **Save & test**.
+3. In the app: tap the gear, enter `your-name/your-repo` and the token, then **Save & test**.
 
 The app refuses to sync to a public repo. The token is stored only in the phone's browser storage, and the app's content security policy lets it talk to `api.github.com` and nothing else.
 
