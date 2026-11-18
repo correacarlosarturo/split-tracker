@@ -590,6 +590,7 @@ applyTheme();
 const dlg=$('#settings');
 function openSettings(){const c=cfg();$('#set-repo').value=c?c.repo:'';$('#set-token').value='';$('#set-target').value=targetKg()||'';$('#set-token').placeholder=c?'Token saved. Leave empty to keep it':'github_pat_…';$('#set-build').textContent='App version '+BUILD;$('#set-msg').textContent='';refreshStatus();if(dlg.showModal)dlg.showModal();else dlg.setAttribute('open','');}
 $('#sync').addEventListener('click',openSettings);
+$('#gear').addEventListener('click',openSettings);
 $('#set-close').addEventListener('click',()=>dlg.close());
 $('#set-target').addEventListener('change',e=>{const v=Number(String(e.target.value).replace(',','.'));if(v>0)lsSet(LS_T,v);else localStorage.removeItem(LS_T);try{renderStats();}catch(x){}});
 $('#set-save').addEventListener('click',async()=>{

@@ -317,10 +317,13 @@ html[data-contrast="high"] .btn,html[data-contrast="high"] input[type=text],html
 #settings .seg{background:var(--inset);border-radius:999px;padding:3px}
 .hcrow{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;margin-top:12px}
 .hcrow input{width:26px;height:26px;accent-color:var(--accent)}
+#gear{flex:none;width:44px;height:44px;margin:-8px 0 -8px -12px;display:inline-flex;align-items:center;justify-content:center;border:0;background:none;color:var(--ink);border-radius:50%;cursor:pointer}
+#gear:active{background:var(--inset)}
+header .in{justify-content:flex-start}header .in h1{flex:1;min-width:0}
 </style>
 </head>
 <body>
-<header><div class="in"><h1>Five-Day Split</h1><button id="sync" type="button" data-s="warn">Starting…</button></div></header>
+<header><div class="in"><button id="gear" type="button" aria-label="Settings"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.56 1.04H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z"/></svg></button><h1>Five-Day Split</h1><button id="sync" type="button" data-s="warn">Starting…</button></div></header>
 <dialog id="settings"><h2>Settings</h2><p id="set-status"></p>
 <h3>Cloud sync</h3><p class="sub" style="margin:0;font-size:13px;color:var(--muted)">Your workouts always save on this phone first. Sync copies them to your private GitHub repo so Claude can read them.</p>
 <label for="set-repo">Private repo (owner/name)</label><input id="set-repo" type="text" placeholder="your-name/your-private-repo" autocapitalize="off" autocorrect="off" spellcheck="false">
@@ -435,7 +438,7 @@ let sampleCache=null;
 const LS_CO='split-coach-v1',LS_CS='split-coach-shas-v1';
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const LS_S='split-sessions-v2',LS_Q='split-queue-v1',LS_C='split-sync-cfg-v1',LS_H='split-shas-v1',LS_L='split-lastsync-v1';
-const BUILD='2026-11-18.1057';
+const BUILD='2026-11-18.1104';
 const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}};
 function idbOpen(){return new Promise((res,rej)=>{try{const r=indexedDB.open('split',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);}catch(e){rej(e);}});}
@@ -1004,6 +1007,7 @@ applyTheme();
 const dlg=$('#settings');
 function openSettings(){const c=cfg();$('#set-repo').value=c?c.repo:'';$('#set-token').value='';$('#set-target').value=targetKg()||'';$('#set-token').placeholder=c?'Token saved. Leave empty to keep it':'github_pat_…';$('#set-build').textContent='App version '+BUILD;$('#set-msg').textContent='';refreshStatus();if(dlg.showModal)dlg.showModal();else dlg.setAttribute('open','');}
 $('#sync').addEventListener('click',openSettings);
+$('#gear').addEventListener('click',openSettings);
 $('#set-close').addEventListener('click',()=>dlg.close());
 $('#set-target').addEventListener('change',e=>{const v=Number(String(e.target.value).replace(',','.'));if(v>0)lsSet(LS_T,v);else localStorage.removeItem(LS_T);try{renderStats();}catch(x){}});
 $('#set-save').addEventListener('click',async()=>{
