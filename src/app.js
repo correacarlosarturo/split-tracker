@@ -15,24 +15,64 @@ const num=v=>{const x=parseFloat(String(v).replace(',','.'));return isFinite(x)?
 const fmtKg=x=>(Math.round(x*100)/100).toString();
 const exById=id=>EX.find(e=>e.id===id);
 
-const state={sessions:{},real:false,tab:'stats',date:todayStr(),draft:null,dirty:false,win:7,wr:'3M',ar:'6M',mode:'recovery',sel:null,sync:'connecting',confirmDel:false};
+const state={sessions:{},real:false,tab:'stats',date:todayStr(),draft:null,dirty:false,wr:'3M',ar:'6M',sel:null,sync:'connecting',confirmDel:false};
 let sampleCache=null;
 /* ---------- local-first data layer + GitHub sync ---------- */
 const LS_CO='split-coach-v1',LS_CS='split-coach-shas-v1';
 const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const LS_S='split-sessions-v2',LS_Q='split-queue-v1',LS_C='split-sync-cfg-v1',LS_H='split-shas-v1',LS_L='split-lastsync-v1';
+const LS_S='split-sessions-v2',LS_SA='split-sessions-at-v1',LS_Q='split-queue-v1',LS_C='split-sync-cfg-v1',LS_H='split-shas-v1',LS_L='split-lastsync-v1';
 const BUILD='__BUILD__';
+const DATE_RE=/^\d{4}-\d{2}-\d{2}$/,FILE_RE=/^\d{4}-\d{2}-\d{2}\.json$/,REPO_RE=/^[\w.-]+\/[\w.-]+$/;
+const dayOf=id=>DAYS.find(x=>x.id===id)||null;
 const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}};
+/* Every session that enters the app (phone storage, sync, backup import) goes through here.
+   Unknown fields are dropped and every value gets the type the renderers expect. */
+function cleanSession(date,v){
+  if(!DATE_RE.test(date)||!v||typeof v!=='object'||Array.isArray(v)||!dayOf(v.day))return null;
+  const src=v.entries;if(!src||typeof src!=='object'||Array.isArray(src))return null;
+  const out={date,day:v.day,entries:{}};
+  for(const id of Object.keys(src)){
+    const ex=exById(id),en=src[id];if(!ex||ex.d!==v.day||!en||typeof en!=='object')continue;
+    const sets=(Array.isArray(en.sets)?en.sets:[]).map(s=>s&&typeof s==='object'?{kg:num(s.kg),reps:num(s.reps)}:null).filter(s=>s&&s.kg!==null&&s.kg>=0&&s.reps!==null&&s.reps>0);
+    if(!sets.length)continue;
+    const e={sets};
+    if(typeof en.alt==='string'&&(ALT[ex.k]||[]).some(a=>a.id===en.alt))e.alt=en.alt;
+    const r=num(en.rpe);if(r!==null&&r>0)e.rpe=r;
+    out.entries[id]=e;
+  }
+  const bw=num(v.bw);if(bw!==null&&bw>0)out.bw=bw;
+  if(typeof v.notes==='string'&&v.notes.trim())out.notes=v.notes.trim();
+  if(typeof v.savedAt==='string'&&!isNaN(Date.parse(v.savedAt)))out.savedAt=v.savedAt;
+  return out;
+}
+function cleanSessions(o){const out={};if(o&&typeof o==='object')for(const d of Object.keys(o)){const s=cleanSession(d,o[d]);if(s)out[d]=s;}return out;}
+/* the unsaved-draft backup keeps raw input strings, but only in the shape renderLog expects */
+function cleanBackup(b){
+  if(!b||typeof b!=='object'||!DATE_RE.test(b.date)||!dayOf(b.day)||!b.entries||typeof b.entries!=='object')return null;
+  const str=x=>x==null?undefined:String(x),entries={};
+  for(const id of Object.keys(b.entries)){
+    const ex=exById(id),en=b.entries[id];if(!ex||!en||typeof en!=='object')continue;
+    entries[id]={sets:Array.isArray(en.sets)?en.sets.map(s=>s&&typeof s==='object'?{kg:str(s.kg),reps:str(s.reps)}:null):[]};
+    if(typeof en.alt==='string')entries[id].alt=en.alt;
+    if(en.rpe!=null)entries[id].rpe=String(en.rpe);
+  }
+  return{date:b.date,day:b.day,bw:str(b.bw)||'',notes:typeof b.notes==='string'?b.notes:'',entries};
+}
 function idbOpen(){return new Promise((res,rej)=>{try{const r=indexedDB.open('split',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);}catch(e){rej(e);}});}
-async function idbPut(k,v){try{const d=await idbOpen();await new Promise((res,rej)=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error);});}catch(e){}}
+async function idbPut(k,v){try{const d=await idbOpen();await new Promise((res,rej)=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error);});return true;}catch(e){return false;}}
 async function idbGet(k){try{const d=await idbOpen();return await new Promise((res,rej)=>{const q=d.transaction('kv').objectStore('kv').get(k);q.onsuccess=()=>res(q.result);q.onerror=()=>rej(q.error);});}catch(e){return undefined;}}
-function persistSessions(){const ok=lsSet(LS_S,state.sessions);idbPut('sessions',JSON.stringify(state.sessions));return ok||!!window.indexedDB;}
+/* Both stores get the same timestamp, so on start the newer copy wins. True only if at least one write landed. */
+async function persistSessions(){
+  const at=Date.now(),ok=lsSet(LS_S,state.sessions)&&lsSet(LS_SA,at);
+  const ok2=await idbPut('sessions',JSON.stringify({at,s:state.sessions}));
+  return ok||ok2;
+}
 const queueGet=()=>lsGet(LS_Q,{});
 function queue(date,op){const q=queueGet();q[date]=op;lsSet(LS_Q,q);schedSync(15000);}
-const cfg=()=>{const c=lsGet(LS_C,null);return c&&c.repo&&c.token?c:null;};
+const cfg=()=>{const c=lsGet(LS_C,null);return c&&typeof c.repo==='string'&&REPO_RE.test(c.repo)&&typeof c.token==='string'&&c.token?c:null;};
 let syncT=null,syncing=false,syncState=cfg()?'pending':'off',syncAt=lsGet(LS_L,null),syncErr='';
-const hhmmOf=iso=>{const n=new Date(iso);return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');};
+const hhmmOf=t=>{const n=new Date(t);return pad2(n.getHours())+':'+pad2(n.getMinutes());};
 function refreshStatus(){
   const el=$('#sync');if(!el)return;let t,s;
   if(state.dirty){t='Unsaved changes';s='warn';}
@@ -51,23 +91,51 @@ function stamp(msg){const el=$('#sync');if(el){el.textContent=msg;el.dataset.s='
 function schedSync(ms){clearTimeout(syncT);if(!cfg()){syncState='off';refreshStatus();return;}if(syncState!=='syncing')syncState='pending';refreshStatus();syncT=setTimeout(runSync,ms===undefined?1500:ms);}
 const b64=s=>btoa(unescape(encodeURIComponent(s)));
 const unb64=s=>decodeURIComponent(escape(atob(s.replace(/\s/g,''))));
-async function gh(path,opt){
-  const c=cfg(),o=Object.assign({method:'GET'},opt||{}),ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),20000);
+async function gh(path,opt,c){
+  c=c||cfg();const o=Object.assign({method:'GET'},opt||{}),ctl=new AbortController(),tm=setTimeout(()=>ctl.abort(),20000);
   const h={'Authorization':'Bearer '+c.token,'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'};
   if(o.body)h['Content-Type']='application/json';
   try{return await fetch('https://api.github.com/repos/'+c.repo+path,{method:o.method,headers:h,body:o.body,cache:'no-store',signal:ctl.signal});}finally{clearTimeout(tm);}
 }
 function httpErr(r){const e=new Error('http');e.status=r.status;return e;}
+function syncErrOf(kind){const e=new Error(kind);e.kind=kind;return e;}
+/* Runs before anything is sent, on setup and on every sync, so a repo made public later stops receiving logs. */
+async function checkRepo(c){
+  const r=await gh('',null,c);if(!r.ok)throw httpErr(r);
+  const j=await r.json();
+  if(j.private!==true)throw syncErrOf('public');
+  if(!j.permissions||!j.permissions.push)throw syncErrOf('readonly');
+  return j;
+}
+/* Lists a top-level folder with the git trees API, which has no 1000-entry cap (the contents API does). */
+async function repoRoot(branch){
+  const r=await gh('/git/trees/'+String(branch||'main').split('/').map(encodeURIComponent).join('/'));
+  if(r.status===404||r.status===409)return[];/* 409: repo has no commits yet */
+  if(!r.ok)throw httpErr(r);
+  const j=await r.json();return Array.isArray(j.tree)?j.tree:[];
+}
+async function listDir(root,name){
+  const d=root.find(t=>t.path===name&&t.type==='tree');if(!d)return[];
+  const r=await gh('/git/trees/'+d.sha);if(!r.ok)throw httpErr(r);
+  const j=await r.json();
+  return(Array.isArray(j.tree)?j.tree:[]).filter(t=>t.type==='blob'&&FILE_RE.test(t.path)).map(t=>({name:t.path,sha:t.sha}));
+}
+function refreshViews(){
+  const ae=document.activeElement,typing=ae&&/INPUT|TEXTAREA/.test(ae.tagName);
+  if(!typing){if(!state.dirty)initDraft(state.date);renderAll();}else renderStats();
+}
 async function runSync(){
   if(syncing)return;const c=cfg();
   if(!c){syncState='off';refreshStatus();return;}
   if(navigator.onLine===false){syncState='offline';refreshStatus();return;}
   syncing=true;syncState='syncing';refreshStatus();
   try{
-    const shas=lsGet(LS_H,{});
+    const repo=await checkRepo(c);
+    const shas=lsGet(LS_H,{}),pushed=new Set();
     /* 1. push what is waiting */
     for(const date of Object.keys(queueGet())){
-      const op=queueGet()[date];if(!op)continue;
+      const op=queueGet()[date];
+      if(!op||!DATE_RE.test(date)){const q=queueGet();delete q[date];lsSet(LS_Q,q);continue;}
       const path='/contents/sessions/'+date+'.json',doc=state.sessions[date];
       if(op==='put'&&!doc){const q=queueGet();delete q[date];lsSet(LS_Q,q);continue;}
       const stampAt=doc&&doc.savedAt;let done=false;
@@ -80,7 +148,7 @@ async function runSync(){
         else r=await gh(path,{method:'DELETE',body:JSON.stringify({message:'delete '+date,sha})});
         if(r.ok){
           const j=await r.json();
-          if(op==='put')shas[date]=j.content.sha;else delete shas[date];
+          if(op==='put'){shas[date]=j.content.sha;pushed.add(date);}else delete shas[date];
           lsSet(LS_H,shas);
           const q=queueGet(),cur=state.sessions[date];
           if(!(op==='put'&&cur&&cur.savedAt!==stampAt)&&q[date]===op){delete q[date];lsSet(LS_Q,q);}
@@ -91,50 +159,50 @@ async function runSync(){
       if(!done)throw httpErr({status:409});
     }
     /* 2. pull what changed elsewhere */
-    const l=await gh('/contents/sessions');let changed=false,files=[];
-    if(l.status===200)files=await l.json();else if(l.status!==404)throw httpErr(l);
+    const root=await repoRoot(repo.default_branch),files=await listDir(root,'sessions');let changed=false;
     for(const f of files){
-      if(!/^\d{4}-\d{2}-\d{2}\.json$/.test(f.name))continue;
       const date=f.name.slice(0,-5);
       if(shas[date]===f.sha||queueGet()[date])continue;
       const g=await gh('/contents/sessions/'+f.name);if(!g.ok)continue;
-      let doc;try{doc=JSON.parse(unb64((await g.json()).content));}catch(e){continue;}
-      if(!doc||typeof doc!=='object'||!doc.entries)continue;
+      let doc;try{doc=cleanSession(date,JSON.parse(unb64((await g.json()).content)));}catch(e){continue;}
+      if(!doc)continue;
       const loc=state.sessions[date];
       if(!loc||(doc.savedAt||'')>(loc.savedAt||'')){state.sessions[date]=doc;changed=true;shas[date]=f.sha;}
       else if((doc.savedAt||'')<(loc.savedAt||'')){shas[date]=f.sha;const q=queueGet();q[date]='put';lsSet(LS_Q,q);}
       else shas[date]=f.sha;
     }
+    /* 3. sessions this phone has but the repo does not. If this phone synced it before (it has a sha)
+          and has not edited it since, it was deleted elsewhere: delete it here too. Otherwise upload it.
+          An empty repo is treated as reset, never as "delete everything". */
     const remote=new Set(files.map(f=>f.name.slice(0,-5))),q2=queueGet();
-    for(const d in state.sessions){if(!remote.has(d)&&!q2[d]){q2[d]='put';}}
+    for(const d of Object.keys(state.sessions)){
+      if(remote.has(d)||q2[d]||pushed.has(d))continue;
+      if(shas[d]&&files.length){delete state.sessions[d];changed=true;}
+      else q2[d]='put';
+    }
+    for(const d of Object.keys(shas)){if(!remote.has(d)&&!pushed.has(d))delete shas[d];}
     lsSet(LS_Q,q2);lsSet(LS_H,shas);
-    if(changed){state.real=Object.keys(state.sessions).length>0;persistSessions();
-      const ae=document.activeElement,typing=ae&&/INPUT|TEXTAREA/.test(ae.tagName);
-      if(!typing){if(!state.dirty)initDraft(state.date);renderAll();}else renderStats();}
+    /* 4. coach notes for the last couple of days */
     try{
-      const cl=await gh('/contents/coach');
-      if(cl.status===200){
-        const cf=await cl.json(),co=lsGet(LS_CO,{}),cs=lsGet(LS_CS,{}),keep=addDays(todayStr(),-2);
-        for(const f of cf){
-          if(!/^\d{4}-\d{2}-\d{2}\.json$/.test(f.name))continue;
-          const date=f.name.slice(0,-5);if(date<keep||cs[date]===f.sha)continue;
-          const g=await gh('/contents/coach/'+f.name);if(!g.ok)continue;
-          try{const o=JSON.parse(unb64((await g.json()).content));if(o&&typeof o==='object'){co[date]=o;cs[date]=f.sha;changed=true;}}catch(e){}
-        }
-        for(const k of Object.keys(co)){if(k<keep)delete co[k];}
-        lsSet(LS_CO,co);lsSet(LS_CS,cs);state.coach=co;
+      const cf=await listDir(root,'coach'),co=lsGet(LS_CO,{}),cs=lsGet(LS_CS,{}),keep=addDays(todayStr(),-2);
+      for(const f of cf){
+        const date=f.name.slice(0,-5);if(date<keep||cs[date]===f.sha)continue;
+        const g=await gh('/contents/coach/'+f.name);if(!g.ok)continue;
+        try{const o=JSON.parse(unb64((await g.json()).content));if(o&&typeof o==='object'&&!Array.isArray(o)){co[date]=o;cs[date]=f.sha;changed=true;}}catch(e){}
       }
+      for(const k of Object.keys(co)){if(k<keep){delete co[k];delete cs[k];}}
+      lsSet(LS_CO,co);lsSet(LS_CS,cs);state.coach=co;
     }catch(e){}
-    if(changed){state.real=Object.keys(state.sessions).length>0;persistSessions();
-      const ae2=document.activeElement,typing2=ae2&&/INPUT|TEXTAREA/.test(ae2.tagName);
-      if(!typing2){if(!state.dirty)initDraft(state.date);renderAll();}else renderStats();}
+    if(changed){state.real=Object.keys(state.sessions).length>0;await persistSessions();refreshViews();}
     syncAt=new Date().toISOString();lsSet(LS_L,syncAt);syncErr='';
     syncState=Object.keys(queueGet()).length?'pending':'ok';
     syncing=false;refreshStatus();
     if(syncState==='pending')schedSync(500);
   }catch(e){
     syncing=false;
-    if(e&&e.status===401){syncState='error';syncErr='token rejected';}
+    if(e&&e.kind==='public'){syncState='error';syncErr='repo is public, sync paused';}
+    else if(e&&e.kind==='readonly'){syncState='error';syncErr='token cannot write';}
+    else if(e&&e.status===401){syncState='error';syncErr='token rejected';}
     else if(e&&e.status===403){syncState='error';syncErr='token has no access';}
     else if(e&&e.status===404){syncState='error';syncErr='repo not found';}
     else if(e&&e.status){syncState='error';syncErr='GitHub error '+e.status;}
@@ -144,15 +212,20 @@ async function runSync(){
   }
 }
 const db={doc:p=>{const date=p.split('/')[1];return{
-  set:async d=>{state.sessions[date]=d;state.real=true;if(!persistSessions())throw new Error('storage');queue(date,'put');},
-  delete:async()=>{delete state.sessions[date];state.real=Object.keys(state.sessions).length>0;persistSessions();queue(date,'del');}
+  set:async d=>{state.sessions[date]=d;state.real=true;if(!(await persistSessions()))throw new Error('storage');queue(date,'put');},
+  delete:async()=>{delete state.sessions[date];state.real=Object.keys(state.sessions).length>0;await persistSessions();queue(date,'del');}
 };}};
-function loadLocal(){state.coach=lsGet(LS_CO,{});const s=lsGet(LS_S,null);if(s&&typeof s==='object'){state.sessions=s;state.real=Object.keys(s).length>0;}}
+function loadLocal(){const co=lsGet(LS_CO,{});state.coach=co&&typeof co==='object'?co:{};state.sessions=cleanSessions(lsGet(LS_S,{}));state.real=Object.keys(state.sessions).length>0;}
+/* IndexedDB is the second copy. Use it when it is newer than localStorage (a localStorage write failed)
+   or when localStorage is empty (older builds stored no timestamp). */
 async function initDb(){
-  if(!Object.keys(state.sessions).length){
-    const m=await idbGet('sessions');
-    if(m){try{const o=JSON.parse(m);if(o&&Object.keys(o).length){state.sessions=o;state.real=true;lsSet(LS_S,o);if(!state.dirty)initDraft(state.date);renderAll();}}catch(e){}}
-  }
+  const m=await idbGet('sessions');
+  if(m){try{
+    const o=JSON.parse(m),snap=o&&typeof o.at==='number'&&o.s?o:{at:0,s:o},lsAt=Number(lsGet(LS_SA,0))||0;
+    const useIdb=snap.at>lsAt||(!snap.at&&!Object.keys(state.sessions).length);
+    const s=useIdb?cleanSessions(snap.s):null;
+    if(s&&Object.keys(s).length){state.sessions=s;state.real=true;lsSet(LS_S,s);if(snap.at)lsSet(LS_SA,snap.at);if(!state.dirty)initDraft(state.date);renderAll();}
+  }catch(e){}}
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
   refreshStatus();schedSync(800);
 }
@@ -196,13 +269,6 @@ function heat(sessions,now,win){
     out[m]={f,sets,last,rem:Math.max(0,rem),st};
   }
   return out;
-}
-const STATUS={idle:'No recent work',ready:'Recovered',almost:'Almost ready',recovering:'Recovering',fatigued:'Freshly trained'};
-function heatColor(h){
-  if(h.st==='idle')return'var(--idle)';
-  if(h.st==='ready')return'var(--sage)';
-  const f=h.f;
-  return f>=.5?`color-mix(in srgb,var(--clay) ${Math.round(55+f*45)}%,var(--sand))`:`color-mix(in srgb,var(--sand) ${Math.round(60+f*80)}%,var(--sage))`;
 }
 const entryKey=(ex,en)=>en&&en.alt?ex.k+'~'+en.alt:ex.k;
 const altOf=(ex,en)=>en&&en.alt?(ALT[ex.k]||[]).find(a=>a.id===en.alt)||null:null;
@@ -257,8 +323,7 @@ function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');
 const BK='split-draft-v1';
 function backupDraft(){try{const d=state.draft;if(d&&state.dirty)localStorage.setItem(BK,JSON.stringify(d));}catch(e){}}
 function clearBackup(){try{localStorage.removeItem(BK);}catch(e){}}
-function stamp(msg){const el=$('#sync');if(el){el.textContent=msg;}}
-const hhmm=()=>{const n=new Date();return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');};
+const hhmm=()=>hhmmOf(Date.now());
 let autoT=null,saving=false;
 function scheduleAuto(){backupDraft();clearTimeout(autoT);refreshStatus();autoT=setTimeout(autoSave,500);}
 async function autoSave(){
@@ -306,7 +371,7 @@ function bodySvg(side,fillFor,label,H){
 }
 
 /* ---------- renderers ---------- */
-function renderAll(){renderLog();renderPlan();renderStats();renderCoach();observeFigs();}
+function renderAll(){renderLog();renderPlan();renderStats();renderCoach();}
 const figHtml=(ex)=>{const f=FIGIMG.imgs[FIGIMG.map[ex.id]];if(!f)return'';return`<div class="fx" role="img" aria-label="${ex.n}: start and end position"><img src="${f[0]}" alt="" loading="lazy" decoding="async"><img src="${f[1]}" alt="" loading="lazy" decoding="async"></div>`;};
 const srcTag=ex=>ex.src==='swap'?'<span class="tag swap">swapped</span>':ex.src==='add'?'<span class="tag add">added</span>':ex.tw?'<span class="tag tw">sets changed</span>':'<span class="tag reel">from reel</span>';
 
@@ -316,12 +381,12 @@ function altsHtml(ex,cur){
 }
 function renderLog(){
   const root=$('#tab-log');if(!state.draft)initDraft(state.date);
-  const d=state.draft,day=DAYS.find(x=>x.id===d.day),exs=EX.filter(e=>e.d===d.day);
+  const d=state.draft,day=dayOf(d.day)||DAYS[0],exs=EX.filter(e=>e.d===d.day);
   const real=state.sessions,now=Date.now(),H=heat(real,now,7);
   const prim={};exs.forEach(e=>{for(const m in e.m)if(e.m[m]>=.8)prim[m]=1;});
   const ready=Object.keys(prim).map(m=>`<span class="chip st-${H[m].st}"><i></i>${MUSCLES[m]}<b>${H[m].st==='idle'||H[m].st==='ready'?'ready':'~'+Math.ceil(H[m].rem)+' h'}</b></span>`).join('');
   const exists=!!state.sessions[d.date];
-  let h=`<section class="card head"><div class="row"><label class="fld"><span>Date</span><input type="date" id="f-date" value="${d.date}"></label><label class="fld"><span>Body weight, kg</span><input type="text" inputmode="decimal" id="f-bw" value="${d.bw||''}" placeholder="optional"></label></div>
+  let h=`<section class="card head"><div class="row"><label class="fld"><span>Date</span><input type="date" id="f-date" value="${esc(d.date)}"></label><label class="fld"><span>Body weight, kg</span><input type="text" inputmode="decimal" id="f-bw" value="${esc(d.bw||'')}" placeholder="optional"></label></div>
   <div class="days" role="tablist">${DAYS.map(x=>`<button class="daybtn${x.id===d.day?' on':''}" data-day="${x.id}"><b>${x.id}</b><span>${x.name}</span>${x.id===suggestedDay()&&!exists?'<em>next</em>':''}</button>`).join('')}</div>
   <p class="sub">${day.wd} template. ${day.tag}. About ${dayStats(day.id).sets} sets, ${dayStats(day.id).min} min.</p>
   <div class="ready"><span class="lbl">Muscles for this day if you train now</span>${ready}</div></section>`;
@@ -331,17 +396,17 @@ function renderLog(){
     const last=le?'Last time ('+fmtDate(le.date)+'): '+le.sets.map(s=>fmtKg(s.kg)+'×'+s.reps).join(', '):'No history yet.';
     let rows='';
     for(let i=0;i<ex.s;i++){
-      const v=en[i]||{};const kg=v.kg!==undefined?v.kg:fmtKg(sg.kg);
-      rows+=`<div class="set"><span class="n">${i+1}</span><label><input type="text" inputmode="decimal" data-ex="${ex.id}" data-i="${i}" data-f="kg" value="${kg}" aria-label="${ex.n} set ${i+1} weight"></label><span class="x">kg ×</span><label><input type="text" inputmode="numeric" data-ex="${ex.id}" data-i="${i}" data-f="reps" value="${v.reps===undefined?'':v.reps}" placeholder="${ex.r[0]}-${ex.r[1]}" aria-label="${ex.n} set ${i+1} reps"></label></div>`;
+      const v=en[i]||{};const kg=v.kg!=null?v.kg:fmtKg(sg.kg);
+      rows+=`<div class="set"><span class="n">${i+1}</span><label><input type="text" inputmode="decimal" data-ex="${ex.id}" data-i="${i}" data-f="kg" value="${esc(kg)}" aria-label="${ex.n} set ${i+1} weight"></label><span class="x">kg ×</span><label><input type="text" inputmode="numeric" data-ex="${ex.id}" data-i="${i}" data-f="reps" value="${esc(v.reps)}" placeholder="${ex.r[0]}-${ex.r[1]}" aria-label="${ex.n} set ${i+1} reps"></label></div>`;
     }
     return`<section class="card ex" id="x-${ex.id}"><div class="exhead"><div><h3>${alt?alt.n:ex.n}</h3><div class="meta"><span class="big">${ex.s} × ${ex.r[0]}–${ex.r[1]}</span> ${alt?`<span class="tag swap">instead of ${ex.n}</span>`:srcTag(ex)}</div></div></div>
     <div class="exbody">${alt?`<div class="fx static"><img src="${ALTIMG[alt.rid]}" alt=""></div>`:figHtml(ex)}<div class="info"><p class="cue">${alt?alt.cue:ex.cue}</p><p class="tgt"><b>Next: ${fmtKg(sg.kg)} kg</b> <span>${alt?alt.u:ex.u}</span><br>${sg.text}</p><p class="hist">${last}</p>${!alt&&ex.note?`<p class="note">${ex.note}</p>`:''}${!alt&&ex.tw?`<p class="note">Sets changed from ${ex.rs} to ${ex.s}. ${ex.tw}</p>`:''}</div></div>${altsHtml(ex,alt)}
-    <div class="sets">${rows}</div><label class="rpe">Effort (RPE 6–10) <input type="text" inputmode="decimal" data-ex="${ex.id}" data-f="rpe" value="${(d.entries[ex.id]||{}).rpe||''}" placeholder="optional" aria-label="${ex.n} effort"></label></section>`;
+    <div class="sets">${rows}</div><label class="rpe">Effort (RPE 6–10) <input type="text" inputmode="decimal" data-ex="${ex.id}" data-f="rpe" value="${esc((d.entries[ex.id]||{}).rpe||'')}" placeholder="optional" aria-label="${ex.n} effort"></label></section>`;
   }).join('');
-  h+=`<section class="card"><label class="fld"><span>Session notes</span><textarea id="f-notes" rows="2" placeholder="Sleep, how it felt, anything Claude should know">${d.notes||''}</textarea></label>
+  h+=`<section class="card"><label class="fld"><span>Session notes</span><textarea id="f-notes" rows="2" placeholder="Sleep, how it felt, anything Claude should know">${esc(d.notes||'')}</textarea></label>
   <div class="actions"><button class="btn primary" id="b-save">${exists?'Update session':'Save session'}</button>${exists?`<button class="btn ghost danger" id="b-del">${state.confirmDel?'Tap again to delete':'Delete session'}</button>`:''}</div></section>`;
   const recent=Object.keys(state.sessions).sort().reverse().slice(0,6);
-  h+=`<section class="card"><h3 class="sec">Recent sessions</h3>${recent.length?`<div class="recent">${recent.map(k=>`<button class="rbtn" data-load="${k}"><b>${fmtDate(k)}</b><span>${state.sessions[k].day} ${DAYS.find(x=>x.id===state.sessions[k].day).name}</span><em>${Object.keys(state.sessions[k].entries||{}).length} lifts</em></button>`).join('')}</div>`:'<p class="sub">No sessions saved yet. Your first save appears here and feeds the heat map and the coach tab.</p>'}</section>`;
+  h+=`<section class="card"><h3 class="sec">Recent sessions</h3>${recent.length?`<div class="recent">${recent.map(k=>`<button class="rbtn" data-load="${k}"><b>${fmtDate(k)}</b><span>${esc(state.sessions[k].day)} ${esc((dayOf(state.sessions[k].day)||{}).name)}</span><em>${Object.keys(state.sessions[k].entries||{}).length} lifts</em></button>`).join('')}</div>`:'<p class="sub">No sessions saved yet. Your first save appears here and feeds the heat map and the coach tab.</p>'}</section>`;
   root.innerHTML=h;
 }
 
@@ -373,7 +438,7 @@ function weekStreak(){
 const AR={'Week':1,'Month':5,'Quarter':13,'6M':26,'Year':53};
 function activityHtml(){
   const today=todayStr(),W=AR[state.ar]||26,start=addDays(mondayOf(today),-(W-1)*7);
-  const tot={},cnt={};realList().forEach(s=>{const e=effort(s);tot[s.date]=Object.keys(e).reduce((x,m)=>x+e[m],0);});
+  const tot={};realList().forEach(s=>{const e=effort(s);tot[s.date]=Object.keys(e).reduce((x,m)=>x+e[m],0);});
   const inR=Object.keys(tot).filter(d=>d>=start&&d<=today);
   const sum=`<p class="sub actsum">${inR.length} workout${inR.length===1?'':'s'} · ${Math.round(inR.reduce((x,d)=>x+tot[d],0))} effective sets in this period</p>`;
   const lvl=v=>v<=0?0:v<8?1:v<14?2:v<20?3:4;
@@ -431,32 +496,30 @@ function progressHtml(){
 }
 function renderStats(){
   const root=$('#tab-stats'),sess=activeSessions(),now=Date.now(),win=7;
-  const H=heat(sess,now,win),vol=true,list=realList(),mo=todayStr().slice(0,7);
+  const H=heat(sess,now,win),list=realList(),mo=todayStr().slice(0,7);
   const wp=weightPts().filter(p=>p.d>=addDays(todayStr(),-30)),wd=wp.length>=2?wp[wp.length-1].w-wp[0].w:null;
   const fillFor=m=>{
-    if(!vol)return heatColor(H[m]);
     const a=H[m].sets<=0?0:clamp(.18+.82*H[m].sets/Math.max(BAND[m][1],6),.18,1);
     return a===0?'var(--idle)':`color-mix(in srgb,var(--clay) ${Math.round(a*100)}%,var(--idle))`;
   };
-  const rng={7:'Week',30:'30d',90:'90d',3650:'All'};
   let h=`<section class="hd"><h2>Stats</h2><p class="sub">Progress &amp; history</p><div class="next"><div><span>Next up</span><b>${(()=>{const d=DAYS.find(x=>x.id===suggestedDay());return d.id+' · '+d.name;})()}</b></div><button class="cta" data-tab="log">Start session</button></div></section>
   <div class="tiles"><div class="tile"><span>${icon('dumb')}Workouts</span><b>${list.length}</b></div><div class="tile"><span>${icon('cal')}This month</span><b>${list.filter(s=>s.date.slice(0,7)===mo).length}</b></div><div class="tile"><span>${icon('flame')}Week streak</span><b>${weekStreak()}</b></div><div class="tile"><span>${icon('scale')}Weight 30d</span><b>${wd===null?'–':(wd>0?'+':'')+wd.toFixed(1)+' kg'}</b></div></div>
   <section class="card"><h3 class="sec">Sets trained · last 7 days</h3>
   ${state.real?'':'<p class="banner">Sample week shown on the body map. Save your first session in the Log tab and this switches to your own data.</p>'}
   <div class="bodies">${bodySvg('ant',fillFor,'Front',H)}${bodySvg('post',fillFor,'Back',H)}</div>
-  <div class="scale">${vol?'<span>fewer sets</span><i class="grad vol"></i><span>more sets</span>':'<span>freshly trained</span><i class="grad rec"></i><span>recovered</span><span class="idl"><i></i>no recent work</span>'}</div>
+  <div class="scale"><span>fewer sets</span><i class="grad vol"></i><span>more sets</span></div>
   ${(()=>{const nt=Object.keys(MUSCLES).filter(m=>H[m].sets<=0);return nt.length?`<h3 class="sec">Not trained in the last 7 days</h3><div class="chips">${nt.map(m=>`<button class="mchip" data-m="${m}">${MUSCLES[m]}</button>`).join('')}</div>`:'<p class="sub">Every muscle group got work in the last 7 days.</p>';})()}</section>`;
   const sel=state.sel&&MUSCLES[state.sel]?state.sel:null;
   if(sel){const x=H[sel];h+=`<section class="card detail"><h3>${MUSCLES[sel]}</h3><p>${x.sets?`${x.sets.toFixed(1)} effective sets in the last 7 days. Last worked ${x.last<24?'today':Math.round(x.last/24*10)/10+' days ago'}. Target is ${BAND[sel][0]} to ${BAND[sel][1]} a week.`:'Nothing logged in the last 7 days.'}</p></section>`;}
   h+=`<section class="card"><h3 class="sec">Activity</h3>${activityHtml()}</section><section class="card">${weightHtml()}</section><section class="card">${progressHtml()}</section>`;
   const rec=list.slice(-5).reverse();
-  h+=`<section class="card"><h3 class="sec">Recent workouts</h3>${rec.length?`<div class="recent">${rec.map(s=>{const q=sessStats(s),dn=DAYS.find(x=>x.id===s.day);return`<button class="rbtn" data-open="${s.date}"><b>${fmtDate(s.date)}</b><span>${s.day} ${dn?dn.name:''}</span><em>${q.sets} sets · ${Math.round(q.vol).toLocaleString('en')} kg</em></button>`;}).join('')}</div>`:'<p class="sub">No sessions saved yet.</p>'}</section>`;
+  h+=`<section class="card"><h3 class="sec">Recent workouts</h3>${rec.length?`<div class="recent">${rec.map(s=>{const q=sessStats(s),dn=dayOf(s.day);return`<button class="rbtn" data-open="${esc(s.date)}"><b>${fmtDate(s.date)}</b><span>${esc(s.day)} ${dn?esc(dn.name):''}</span><em>${q.sets} sets · ${Math.round(q.vol).toLocaleString('en')} kg</em></button>`;}).join('')}</div>`:'<p class="sub">No sessions saved yet.</p>'}</section>`;
   const order=Object.keys(MUSCLES).sort((a,b)=>H[b].sets-H[a].sets);
   h+=`<details class="card dd"><summary>Muscle by muscle</summary><div class="mlist">${order.map(m=>`<button class="mrow${sel===m?' on':''}" data-m="${m}"><i style="background:${fillFor(m)}"></i><b>${MUSCLES[m]}</b><span>${H[m].sets?(H[m].last<24?'Today':Math.round(H[m].last/24)+' d ago'):'Not trained'}</span><em>${H[m].sets?H[m].sets.toFixed(1)+' sets':''}</em></button>`).join('')}</div></details>`;
   const nd=Math.min(win,14),days=[];for(let i=nd-1;i>=0;i--)days.push(addDays(todayStr(),-i));
   const eff={};days.forEach(dd=>{eff[dd]=sess[dd]?effort(sess[dd]):null;});
   h+=`<details class="card dd"><summary>Day by day · last ${nd} days</summary><div class="mx" style="--cols:${days.length}"><div class="mh"></div>${days.map(dd=>`<div class="mh">${wdOf(dd).slice(0,2)}<small>${dd.slice(8)}</small></div>`).join('')}
-  <div class="mh lab">Session</div>${days.map(dd=>`<div class="mc ses${sess[dd]?' on':''}">${sess[dd]?sess[dd].day:'rest'}</div>`).join('')}
+  <div class="mh lab">Session</div>${days.map(dd=>`<div class="mc ses${sess[dd]?' on':''}">${sess[dd]?esc(sess[dd].day):'rest'}</div>`).join('')}
   ${Object.keys(MUSCLES).map(m=>`<div class="mh lab">${MUSCLES[m]}</div>${days.map(dd=>{const v=eff[dd]?(eff[dd][m]||0):0;return`<div class="mc" style="${v?`background:color-mix(in srgb,var(--accent) ${Math.round(clamp(.2+v/8,.2,1)*100)}%,transparent)`:''}" title="${v?v.toFixed(1)+' sets':''}">${v>=.5?Math.round(v):(v?'·':'')}</div>`;}).join('')}`).join('')}</div>
   <p class="sub">Numbers are effective hard sets that day. Recovery times assume 36 to 72 hours depending on the muscle and how many sets you did.</p></details>`;
   root.innerHTML=h;
@@ -491,7 +554,7 @@ function renderCoach(){
   if(!list.length)h+='<p class="sub">Nothing logged yet. After your first sessions this shows attendance and strength trends.</p>';
   else{
     const wk=list.filter(s=>s.date>=addDays(todayStr(),-6)).length;
-    h+=`<div class="kpis"><div><b>${wk}/5</b><span>sessions, last 7 days</span></div><div><b>${recent.length}</b><span>sessions, last 14 days</span></div><div><b>${list[list.length-1].bw||'—'}</b><span>last body weight, kg</span></div></div>`;
+    h+=`<div class="kpis"><div><b>${wk}/5</b><span>sessions, last 7 days</span></div><div><b>${recent.length}</b><span>sessions, last 14 days</span></div><div><b>${esc(list[list.length-1].bw||'—')}</b><span>last body weight, kg</span></div></div>`;
     h+=prog.length?`<div class="tbl prog"><div class="tr th"><div class="td nm">Lift</div><div class="td">First</div><div class="td">Best now</div><div class="td">Trend</div></div>${prog.map(p=>`<div class="tr"><div class="td nm"><b>${p.n}</b></div><div class="td">${fmtKg(p.f.kg)}×${p.f.r}</div><div class="td">${fmtKg(p.l.kg)}×${p.l.r}</div><div class="td">${p.ch===null?'one entry':(p.ch>=0?'+':'')+p.ch.toFixed(1)+'%'}</div></div>`).join('')}</div><p class="sub">Trend compares estimated one-rep max (Epley) between your first and latest session for each lift.</p>`:'';
   }
   h+=`</section><section class="card"><h3 class="sec">Next session</h3><p class="sub">${DAYS.find(x=>x.id===suggestedDay()).id} ${DAYS.find(x=>x.id===suggestedDay()).name}. Targets for each lift come from your last entries.</p><div class="tbl">${sug.map(e=>{const s=suggest(e,null);return`<div class="tr"><div class="td nm"><b>${e.n}</b></div><div class="td">${e.s} × ${e.r[0]}–${e.r[1]}</div><div class="td kg">${fmtKg(s.kg)} <small>kg</small></div></div>`;}).join('')}</div></section>`;
@@ -510,15 +573,13 @@ function summaryText(){
 
 /* ---------- animation loop ---------- */
 const reduce=window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches;
-const visible=new Set();let io=null,t0=performance.now(),lastDraw=0;
-function observeFigs(){}
 
 /* ---------- events ---------- */
 function setTab(t){
   state.tab=t;$$('.tab').forEach(x=>x.hidden=x.id!=='tab-'+t);
   $$('.nav button').forEach(b=>{b.classList.toggle('on',b.dataset.tab===t);b.setAttribute('aria-selected',b.dataset.tab===t);});
   try{history.replaceState(null,'','#'+t);}catch(e){}
-  window.scrollTo(0,0);observeFigs();
+  window.scrollTo(0,0);
 }
 document.addEventListener('click',e=>{
   const t=e.target.closest('button,.mus');if(!t)return;
@@ -527,13 +588,11 @@ document.addEventListener('click',e=>{
   if(t.id==='b-del')return deleteSession();
   if(t.id==='b-copy'){const txt=summaryText(),box=$('#copybox');box.value=txt;box.hidden=false;try{navigator.clipboard.writeText(txt).then(()=>toast('Copied'),()=>{box.select();toast('Select and copy the text below');});}catch(x){box.select();}return;}
   if(t.dataset.alt!==undefined){const p=t.dataset.alt.split('|'),en=state.draft.entries[p[0]]||(state.draft.entries[p[0]]={});if(p[1])en.alt=p[1];else delete en.alt;en.sets=[];delete en.rpe;state.dirty=true;scheduleAuto();const y=window.scrollY;renderLog();window.scrollTo(0,y);return;}
-  if(t.dataset.day){const ex=state.sessions[state.date];if(ex&&ex.day===t.dataset.day){initDraft(state.date);}else{const bw=state.draft.bw;state.draft=blankDraft(state.date,t.dataset.day);state.draft.bw=bw;state.dirty=false;}renderLog();observeFigs();return;}
-  if(t.dataset.load){initDraft(t.dataset.load);renderLog();observeFigs();return window.scrollTo(0,0);}
-  if(t.dataset.mode){state.mode=t.dataset.mode;return renderStats();}
-  if(t.dataset.win){state.win=Number(t.dataset.win);return renderStats();}
+  if(t.dataset.day){const ex=state.sessions[state.date];if(ex&&ex.day===t.dataset.day){initDraft(state.date);}else{const bw=state.draft.bw;state.draft=blankDraft(state.date,t.dataset.day);state.draft.bw=bw;state.dirty=false;}renderLog();return;}
+  if(t.dataset.load){initDraft(t.dataset.load);renderLog();return window.scrollTo(0,0);}
   if(t.dataset.ar){state.ar=t.dataset.ar;return renderStats();}
   if(t.dataset.wr){state.wr=t.dataset.wr;return renderStats();}
-  if(t.dataset.open){initDraft(t.dataset.open);renderLog();observeFigs();return setTab('log');}
+  if(t.dataset.open){initDraft(t.dataset.open);renderLog();return setTab('log');}
   if(t.dataset.logbw){setTab('log');const i=$('#f-bw');if(i)i.focus();return;}
   if(t.dataset.m){state.sel=state.sel===t.dataset.m?null:t.dataset.m;return renderStats();}
 });
@@ -551,7 +610,7 @@ document.addEventListener('input',e=>{
 });
 document.addEventListener('change',e=>{
   if(e.target.id==='f-date'&&e.target.value){
-    state.draft=null;initDraft(e.target.value);renderLog();observeFigs();
+    state.draft=null;initDraft(e.target.value);renderLog();
   }
 });
 
@@ -559,7 +618,7 @@ document.addEventListener('change',e=>{
 const hash=(location.hash||'').slice(1);
 if(hash==='heat')state.tab='stats';else if(['stats','log','plan','coach'].indexOf(hash)>=0)state.tab=hash;
 loadLocal();
-try{const b=JSON.parse(localStorage.getItem(BK)||'null');if(b&&b.date&&b.entries&&Object.keys(b.entries).length){state.date=b.date;state.draft=b;state.dirty=true;}}catch(e){}
+try{const b=cleanBackup(JSON.parse(localStorage.getItem(BK)||'null'));if(b&&Object.keys(b.entries).length){state.date=b.date;state.draft=b;state.dirty=true;}}catch(e){}
 if(!state.dirty)initDraft(state.date);renderAll();setTab(state.tab);
 initDb();
 if(state.dirty)setTimeout(autoSave,800);
@@ -595,19 +654,23 @@ $('#set-close').addEventListener('click',()=>dlg.close());
 $('#set-target').addEventListener('change',e=>{const v=Number(String(e.target.value).replace(',','.'));if(v>0)lsSet(LS_T,v);else localStorage.removeItem(LS_T);try{renderStats();}catch(x){}});
 $('#set-save').addEventListener('click',async()=>{
   const repo=$('#set-repo').value.trim().replace(/^https?:\/\/github\.com\//,'').replace(/\.git$/,''),old=cfg(),token=$('#set-token').value.trim()||(old&&old.token)||'',m=$('#set-msg');
-  if(!/^[\w.-]+\/[\w.-]+$/.test(repo)||!token){m.textContent='Enter the repo as owner/name and paste the token.';return;}
-  lsSet(LS_C,{repo,token});m.textContent='Testing…';
-  try{
-    const r=await gh('');
-    if(r.status===401){m.textContent='GitHub rejected the token.';return;}
-    if(r.status===404){m.textContent='Repo not found, or the token cannot see it.';return;}
-    if(!r.ok){m.textContent='GitHub error '+r.status;return;}
-    const j=await r.json();
-    if(!j.permissions||!j.permissions.push){m.textContent='The token can read but not write. Give it Contents: read and write.';return;}
-    if(!j.private){m.textContent='Stopped: that repo is public. Use a private repo for your logs.';localStorage.removeItem(LS_C);return;}
-    m.textContent='Connected. Syncing…';syncState='pending';schedSync(100);setTimeout(()=>{refreshStatus();m.textContent='Connected.';},2500);
-  }catch(e){m.textContent='No connection right now. Settings saved; sync will retry.';schedSync(100);}
+  if(!REPO_RE.test(repo)||!token){m.textContent='Enter the repo as owner/name and paste the token.';return;}
+  const c={repo,token};m.textContent='Testing…';
+  /* test first, save after: nothing is stored (so nothing can sync) until the repo is confirmed private */
+  try{await checkRepo(c);}
+  catch(e){
+    if(e.kind==='public'){m.textContent='Stopped: that repo is public. Use a private repo for your logs.';return;}
+    if(e.kind==='readonly'){m.textContent='The token can read but not write. Give it Contents: read and write.';return;}
+    if(e.status===401){m.textContent='GitHub rejected the token.';return;}
+    if(e.status===404){m.textContent='Repo not found, or the token cannot see it.';return;}
+    if(e.status){m.textContent='GitHub error '+e.status;return;}
+    /* offline: safe to keep, because every sync re-checks that the repo is private before sending anything */
+    saveCfg(c,old);m.textContent='No connection right now. Settings saved; sync checks the repo and retries when online.';schedSync(100);return;
+  }
+  saveCfg(c,old);m.textContent='Connected. Syncing…';syncState='pending';schedSync(100);setTimeout(()=>{refreshStatus();m.textContent='Connected.';},2500);
 });
+/* sync bookkeeping belongs to one repo: switching repos starts it fresh so nothing is mistaken for a remote delete */
+function saveCfg(c,old){if(!old||old.repo.toLowerCase()!==c.repo.toLowerCase()){[LS_H,LS_CS,LS_CO].forEach(k=>{try{localStorage.removeItem(k);}catch(e){}});state.coach={};}lsSet(LS_C,c);}
 $('#set-now').addEventListener('click',()=>{$('#set-msg').textContent='';schedSync(0);});
 $('#set-off').addEventListener('click',()=>{localStorage.removeItem(LS_C);syncState='off';refreshStatus();$('#set-msg').textContent='Sync turned off. Logs stay on this phone.';});
 $('#set-export').addEventListener('click',()=>{
@@ -617,11 +680,11 @@ $('#set-export').addEventListener('click',()=>{
 });
 $('#set-import').addEventListener('change',async e=>{
   const f=e.target.files&&e.target.files[0];if(!f)return;
-  try{const j=JSON.parse(await f.text()),s=j.sessions||j;let n=0;
-    for(const d in s){const v=s[d];if(!/^\d{4}-\d{2}-\d{2}$/.test(d)||!v||!v.entries)continue;const loc=state.sessions[d];if(!loc||(v.savedAt||'')>(loc.savedAt||'')){state.sessions[d]=v;queue(d,'put');n++;}}
-    persistSessions();state.real=Object.keys(state.sessions).length>0;if(!state.dirty)initDraft(state.date);renderAll();$('#set-msg').textContent='Imported '+n+' workout'+(n===1?'':'s')+'.';
+  try{const j=JSON.parse(await f.text()),s=j&&typeof j==='object'?(j.sessions||j):null;if(!s||typeof s!=='object')throw new Error('format');let n=0;
+    for(const d of Object.keys(s)){const v=cleanSession(d,s[d]);if(!v)continue;const loc=state.sessions[d];if(!loc||(v.savedAt||'')>(loc.savedAt||'')){state.sessions[d]=v;queue(d,'put');n++;}}
+    await persistSessions();state.real=Object.keys(state.sessions).length>0;if(!state.dirty)initDraft(state.date);renderAll();$('#set-msg').textContent='Imported '+n+' workout'+(n===1?'':'s')+'.';
   }catch(x){$('#set-msg').textContent='That file is not a valid backup.';}
   e.target.value='';
 });
-if('serviceWorker' in navigator&&location.protocol==='https:'||location.hostname==='localhost'){navigator.serviceWorker.register('sw.js').catch(()=>{});}
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='localhost')){navigator.serviceWorker.register('sw.js').catch(()=>{});}
 })();

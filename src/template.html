@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Split</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src https://api.github.com; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src https://api.github.com; manifest-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'none'">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Split"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" id="tc" content="#faf9f5">
-<script>(function(){try{var T=JSON.parse(localStorage.getItem("split-theme-v1")||"{}"),m=T.mode||"auto",d=document.documentElement,s=m==="auto"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;d.dataset.scheme=s;d.dataset.accent=T.accent||"clay";d.dataset.contrast=T.contrast||"normal";}catch(e){var d=document.documentElement;d.dataset.scheme=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";d.dataset.accent="clay";d.dataset.contrast="normal";}})()</script>
+<script src="theme.js?v=__BUILD__"></script>
 <style>
 /* Layout: one narrow column, sticky header, bottom tab bar. Palette: graphite with indigo accent; heat uses its own red-to-green scale. */
 /* Look: warm paper, clay accent, serif display + system sans, quiet hairline cards (follows the iPhone light/dark setting) */
@@ -355,10 +355,6 @@ header .in h1{flex:none;white-space:nowrap}header .in #sync{flex:1 1 auto;min-wi
 <button data-tab="coach"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h12M8 12h12M8 17h12M4 7h.01M4 12h.01M4 17h.01"/></svg>Coach</button>
 </div></nav>
 <div id="toast" role="status" aria-live="polite"></div>
-<script>
-/*DATA*/
-/*ANIM*/
-/*APP*/
-</script>
+<script src="split.js?v=__BUILD__"></script>
 </body>
 </html>

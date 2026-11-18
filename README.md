@@ -85,13 +85,20 @@ Settings has **Export backup** (a JSON file through the iOS share sheet) and **I
 
 ## Develop
 
-The app is one HTML file built from `src/`:
+The app is built from `src/`:
 
 ```
 python3 src/build.py
 ```
 
-This writes `index.html`, `sw.js` and `manifest.webmanifest` at the repo root. Commit and push, and GitHub Pages redeploys in a minute or two. The service worker serves the cached copy when offline and the fresh copy when online.
+This writes `index.html`, `split.js`, `theme.js`, `sw.js` and `manifest.webmanifest` at the repo root. Scripts live in their own files, not inline, so the content security policy can block inline script.
+
+Tests run the built app in a headless browser against a fake GitHub API (needs Node 18+ and Playwright with Chromium):
+
+```
+npm i --no-save playwright && npx playwright install chromium
+python3 src/build.py && node --test tests/app.test.js
+``` Commit and push, and GitHub Pages redeploys in a minute or two. The service worker serves the cached copy when offline and the fresh copy when online.
 
 Plan data (exercises, sets, rep ranges, start weights) lives in `src/data.js`, and the alternatives in `src/alts.js`.
 
