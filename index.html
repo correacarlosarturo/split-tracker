@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Split"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" id="tc" content="#faf9f5">
-<script src="theme.js?v=2026-11-18.123500"></script>
+<script src="theme.js?v=2026-11-18.123656"></script>
 <style>
 /* Layout: one narrow column, sticky header, bottom tab bar. Palette: graphite with indigo accent; heat uses its own red-to-green scale. */
 /* Look: warm paper, clay accent, serif display + system sans, quiet hairline cards (follows the iPhone light/dark setting) */
@@ -376,6 +376,12 @@ dialog#settings::backdrop{background:rgba(0,0,0,.30)}
 #settings .btn.primary{background:var(--accent);border-color:transparent;color:var(--accent-ink)}
 #settings .seg button.on{background:var(--accent);color:var(--accent-ink)}
 #toast{background:var(--glass-bar);color:var(--ink);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--glass-edge);box-shadow:0 10px 30px var(--glass-shade)}
+/* exercise animation frames: glass edge around the start/end cross-fade */
+.fx{border-radius:var(--radius-card);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-hi),0 6px 18px var(--glass-shade);background:var(--inset)}
+.alt img{border-radius:14px;border:1px solid var(--glass-edge)}
+.nlb{display:grid;grid-template-columns:132px 1fr;gap:14px;align-items:center}
+.nlb .fx{max-width:132px;margin:0}
+.nli b{font:700 19px var(--sans);letter-spacing:-.01em}.nli .sub{margin:2px 0 6px;font-size:14px}.nli .tgt{margin:0 0 6px;font-size:15px}.nli .cue{margin:0;font-size:13.5px;color:var(--muted)}
 /* no backdrop-filter support: bars go near-opaque so text under them stays readable */
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   html{--glass-bar:rgba(246,247,250,.96)}
@@ -420,6 +426,6 @@ html[data-contrast="high"] body::before{display:none}
 <button data-tab="coach"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h12M8 12h12M8 17h12M4 7h.01M4 12h.01M4 17h.01"/></svg>Coach</button>
 </div></nav>
 <div id="toast" role="status" aria-live="polite"></div>
-<script src="split.js?v=2026-11-18.123500"></script>
+<script src="split.js?v=2026-11-18.123656"></script>
 </body>
 </html>

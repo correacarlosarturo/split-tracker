@@ -51,8 +51,9 @@ function fakeGitHub(files,opts={}){
   return {files,repo,calls,handler};
 }
 
-async function openApp({ls={},gh,hash='log'}={}){
-  const ctx=await browser.newContext({serviceWorkers:'block'});
+async function openApp({ls={},gh,hash='log',ctxOpts={},before}={}){
+  const ctx=await browser.newContext(Object.assign({serviceWorkers:'block'},ctxOpts));
+  if(before)await before(ctx);
   const errors=[];
   if(gh)await ctx.route('https://api.github.com/**',gh.handler);
   await ctx.addInitScript(entries=>{if(!sessionStorage.getItem('seeded')){sessionStorage.setItem('seeded','1');for(const k in entries)localStorage.setItem(k,entries[k]);}},Object.fromEntries(Object.entries(ls).map(([k,v])=>[k,JSON.stringify(v)])));
@@ -265,4 +266,34 @@ test('glass: falls back when backdrop-filter is unsupported',async()=>{
   assert.ok(m,'fallback block present');
   const a=m[1].match(/--glass-bar:\s*rgba\([^)]*,\s*([\d.]+)\)/);
   assert.ok(a&&Number(a[1])>=.92,'--glass-bar alpha >= .92');
+});
+
+test('stats shows an animated preview of the next lift',async()=>{
+  const {ctx,page,errors}=await openApp({hash:'stats'});
+  assert.equal(await page.$$eval('.nextlift .fx img',n=>n.length),2);
+  assert.match(await page.textContent('.nextlift'),/Lat pulldown/);
+  assert.match(await page.textContent('.nextlift'),/Next: 55 kg/);
+  assert.equal(await page.$eval('.nextlift .fx img+img',i=>getComputedStyle(i).animationName),'fx');
+  assert.deepEqual(errors,[]);
+  await ctx.close();
+});
+
+test('the preview obeys reduced motion and tap',async()=>{
+  const {ctx,page}=await openApp({hash:'stats',ctxOpts:{reducedMotion:'reduce'}});
+  assert.equal(await page.$eval('.nextlift .fx img+img',i=>getComputedStyle(i).animationName),'none');
+  await page.click('.nextlift .fx');
+  assert.ok(await page.$eval('.nextlift .fx',f=>f.classList.contains('end')));
+  await ctx.close();
+});
+
+test('the preview survives a lift without images',async()=>{
+  const before=ctx=>ctx.route('**/split.js*',async route=>{
+    const r=await route.fetch();const body=(await r.text()).replace('"d1-lat":"lat-pulldown",','');
+    await route.fulfill({response:r,body});
+  });
+  const {ctx,page,errors}=await openApp({hash:'stats',before});
+  assert.match(await page.textContent('.nextlift'),/Lat pulldown/);
+  assert.equal(await page.$$eval('.nextlift img',n=>n.length),0);
+  assert.deepEqual(errors,[]);
+  await ctx.close();
 });
