@@ -9,7 +9,8 @@
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Split"><meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="theme-color" content="#faf9f5" media="(prefers-color-scheme: light)"><meta name="theme-color" content="#262624" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" id="tc" content="#faf9f5">
+<script>(function(){try{var T=JSON.parse(localStorage.getItem("split-theme-v1")||"{}"),m=T.mode||"auto",d=document.documentElement,s=m==="auto"?(matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light"):m;d.dataset.scheme=s;d.dataset.accent=T.accent||"clay";d.dataset.contrast=T.contrast||"normal";}catch(e){var d=document.documentElement;d.dataset.scheme=matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light";d.dataset.accent="clay";d.dataset.contrast="normal";}})()</script>
 <style>
 /* Layout: one narrow column, sticky header, bottom tab bar. Palette: graphite with indigo accent; heat uses its own red-to-green scale. */
 /* Look: warm paper, clay accent, serif display + system sans, quiet hairline cards (follows the iPhone light/dark setting) */
@@ -283,6 +284,39 @@ dialog#settings::backdrop{background:rgba(0,0,0,.45)}
 #settings .fileb{display:inline-flex;align-items:center;justify-content:center;cursor:pointer}#settings .fileb input{display:none}
 #set-status,#set-msg,#set-build{font-size:13px;color:var(--muted);margin:6px 0 0}
 .coachnote{border-left:3px solid var(--accent)}.coachnote p{margin:6px 0 0;white-space:pre-line}
+
+/* ---------- themes: html[data-scheme] light|dark|black, [data-accent], [data-contrast] ---------- */
+html[data-scheme="light"]{--bg:#faf9f5;--surface:#fff;--inset:#f3f1ea;--ink:#141413;--muted:#6b6a64;--line:#e6e3d8;--accent:#c4573a;--accent-ink:#fff;--soft:#f6e6de;--good:#5f8a63;--warn:#a8741a;--bad:#b5412f;--body:#ebe8dd;--idle:#e4e1d6;--clay:#c96442;--sand:#e3b99a;--sage:#8fb08f;--fig:#141413;--eq:#c4573a;--shadow:none;color-scheme:light}
+html[data-scheme="dark"]{--bg:#262624;--surface:#30302e;--inset:#262624;--ink:#faf9f5;--muted:#a9a79d;--line:#444440;--accent:#d97757;--accent-ink:#1f1e1d;--soft:#4a362d;--good:#8db48d;--warn:#e0a653;--bad:#e5786a;--body:#3a3936;--idle:#454440;--clay:#d97757;--sand:#b98c6b;--sage:#7fa27f;--fig:#faf9f5;--eq:#d97757;color-scheme:dark}
+html[data-scheme="black"]{--bg:#262624;--surface:#30302e;--inset:#262624;--ink:#faf9f5;--muted:#a9a79d;--line:#444440;--accent:#d97757;--accent-ink:#1f1e1d;--soft:#4a362d;--good:#8db48d;--warn:#e0a653;--bad:#e5786a;--body:#3a3936;--idle:#454440;--clay:#d97757;--sand:#b98c6b;--sage:#7fa27f;--fig:#faf9f5;--eq:#d97757;color-scheme:dark--bg:#000;--surface:#0f0f0f;--inset:#181818;--line:#2c2c2c;--body:#1b1b1b;--idle:#262626}
+html[data-accent="clay"][data-scheme="light"]{--acc:#c4573a;--acc-clay:#c96442;--acc-soft:#f6e6de}
+html[data-accent="clay"][data-scheme="dark"],html[data-accent="clay"][data-scheme="black"]{--acc:#d97757;--acc-clay:#d97757;--acc-soft:#4a362d}
+html[data-accent="ocean"][data-scheme="light"]{--acc:#2a68a8;--acc-clay:#3b79ba;--acc-soft:#e0ebf7}
+html[data-accent="ocean"][data-scheme="dark"],html[data-accent="ocean"][data-scheme="black"]{--acc:#6fa8e0;--acc-clay:#6fa8e0;--acc-soft:#22384d}
+html[data-accent="forest"][data-scheme="light"]{--acc:#2c7048;--acc-clay:#2f6b4c;--acc-soft:#dfeee4}
+html[data-accent="forest"][data-scheme="dark"],html[data-accent="forest"][data-scheme="black"]{--acc:#6fbf8c;--acc-clay:#4f9a6e;--acc-soft:#223a2b}
+html[data-accent="violet"][data-scheme="light"]{--acc:#6a4cb0;--acc-clay:#7757c2;--acc-soft:#ebe5f7}
+html[data-accent="violet"][data-scheme="dark"],html[data-accent="violet"][data-scheme="black"]{--acc:#a68be3;--acc-clay:#a68be3;--acc-soft:#352c50}
+html[data-accent="graphite"][data-scheme="light"]{--acc:#3b3a37;--acc-clay:#5a5852;--acc-soft:#e8e6df}
+html[data-accent="graphite"][data-scheme="dark"],html[data-accent="graphite"][data-scheme="black"]{--acc:#d9d6cd;--acc-clay:#bdb9ae;--acc-soft:#3b3a37}
+html[data-accent]{--accent:var(--acc);--clay:var(--acc-clay);--soft:var(--acc-soft);--eq:var(--acc)}
+html[data-contrast="high"][data-scheme="light"]{--bg:#fff;--surface:#fff;--inset:#ecebe4;--ink:#000;--muted:#2b2a26;--line:#5e5c53;--good:#2f6a35;--warn:#7a4f00;--bad:#9a2412;--accent:color-mix(in srgb,var(--acc) 62%,#000)}
+html[data-contrast="high"][data-scheme="dark"]{--bg:#161615;--surface:#1f1f1e;--inset:#121211;--ink:#fff;--muted:#dedcd3;--line:#a8a69b;--good:#a6d6a6;--warn:#ffc766;--bad:#ff9d8f;--accent:color-mix(in srgb,var(--acc) 62%,#fff)}
+html[data-contrast="high"][data-scheme="black"]{--bg:#000;--surface:#000;--inset:#0b0b0b;--ink:#fff;--muted:#e2e0d7;--line:#b3b1a6;--good:#a6d6a6;--warn:#ffc766;--bad:#ff9d8f;--accent:color-mix(in srgb,var(--acc) 62%,#fff)}
+html[data-contrast="high"] .card,html[data-contrast="high"] .tile,html[data-contrast="high"] .next{border-width:2px;border-color:var(--line)}
+html[data-contrast="high"] .sub,html[data-contrast="high"] .meta,html[data-contrast="high"] .hist{color:var(--muted)}
+html[data-contrast="high"] .btn,html[data-contrast="high"] input[type=text],html[data-contrast="high"] textarea{border:2px solid var(--line)}
+/* appearance controls in Settings */
+.swatches{display:flex;gap:10px;flex-wrap:wrap;margin-top:4px}
+.sw{width:44px;height:44px;border-radius:50%;border:2px solid var(--line);padding:0;position:relative;cursor:pointer}
+.sw[aria-pressed="true"]{outline:3px solid var(--ink);outline-offset:2px}
+.sw span{position:absolute;left:50%;top:100%;transform:translateX(-50%);font-size:10px;color:var(--muted);margin-top:6px;white-space:nowrap}
+.swrow{padding-bottom:20px}
+#settings .seg{display:flex}#settings .seg button{flex:1;min-height:44px;border:0;background:none;font:500 14px var(--sans);color:var(--ink);border-radius:999px}
+#settings .seg button.on{background:var(--accent);color:var(--accent-ink)}
+#settings .seg{background:var(--inset);border-radius:999px;padding:3px}
+.hcrow{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:44px;margin-top:12px}
+.hcrow input{width:26px;height:26px;accent-color:var(--accent)}
 </style>
 </head>
 <body>
@@ -292,6 +326,15 @@ dialog#settings::backdrop{background:rgba(0,0,0,.45)}
 <label for="set-repo">Private repo (owner/name)</label><input id="set-repo" type="text" placeholder="your-name/your-private-repo" autocapitalize="off" autocorrect="off" spellcheck="false">
 <label for="set-token">Access token</label><input id="set-token" type="password" autocomplete="off" autocapitalize="off" spellcheck="false">
 <div class="row"><button class="btn primary" id="set-save" type="button">Save &amp; test</button><button class="btn" id="set-now" type="button">Sync now</button><button class="btn" id="set-off" type="button">Turn off</button></div>
+<h3>Appearance</h3>
+<label>Mode</label><div class="seg" id="th-mode" role="group" aria-label="Mode"><button type="button" data-mode="auto">Auto</button><button type="button" data-mode="light">Light</button><button type="button" data-mode="dark">Dark</button><button type="button" data-mode="black">Black</button></div>
+<label>Accent colour</label><div class="swatches swrow" id="th-acc" role="group" aria-label="Accent colour">
+<button type="button" class="sw" data-acc="clay" aria-label="Clay" style="background:#c4573a"><span>Clay</span></button>
+<button type="button" class="sw" data-acc="ocean" aria-label="Ocean" style="background:#2a68a8"><span>Ocean</span></button>
+<button type="button" class="sw" data-acc="forest" aria-label="Forest" style="background:#2c7048"><span>Forest</span></button>
+<button type="button" class="sw" data-acc="violet" aria-label="Violet" style="background:#6a4cb0"><span>Violet</span></button>
+<button type="button" class="sw" data-acc="graphite" aria-label="Graphite" style="background:#3b3a37"><span>Graphite</span></button></div>
+<label class="hcrow" for="th-hc"><span>High contrast (easier to read in bright light)</span><input type="checkbox" id="th-hc"></label>
 <h3>Goal</h3><label for="set-target">Target body weight, kg (stays on this phone)</label><input id="set-target" type="text" inputmode="decimal" placeholder="optional">
 <h3>Backup</h3><div class="row"><button class="btn" id="set-export" type="button">Export backup</button><label class="btn fileb" style="margin:0;color:var(--ink)">Import backup<input id="set-import" type="file" accept="application/json,.json"></label></div>
 <p id="set-msg" role="status"></p><p id="set-build"></p>

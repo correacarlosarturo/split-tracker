@@ -569,6 +569,23 @@ window.addEventListener('pagehide',()=>{if(state.dirty)autoSave();});
 window.addEventListener('focus',rollover);
 window.addEventListener('online',()=>schedSync(500));
 document.addEventListener('visibilitychange',()=>{if(document.hidden){if(Object.keys(queueGet()).length)schedSync(0);}else schedSync(500);});
+/* ---------- themes ---------- */
+const LS_TH='split-theme-v1';
+const themeGet=()=>Object.assign({mode:'auto',accent:'clay',contrast:'normal'},lsGet(LS_TH,{}));
+function applyTheme(){
+  const T=themeGet(),d=document.documentElement,mq=matchMedia('(prefers-color-scheme: dark)');
+  d.dataset.scheme=T.mode==='auto'?(mq.matches?'dark':'light'):T.mode;d.dataset.accent=T.accent;d.dataset.contrast=T.contrast;
+  const tc=$('#tc');if(tc)tc.content=getComputedStyle(d).getPropertyValue('--bg').trim()||'#faf9f5';
+  document.querySelectorAll('#th-mode button').forEach(b=>b.classList.toggle('on',b.dataset.mode===T.mode));
+  document.querySelectorAll('#th-acc button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.acc===T.accent?'true':'false'));
+  const hc=$('#th-hc');if(hc)hc.checked=T.contrast==='high';
+}
+function setTheme(p){lsSet(LS_TH,Object.assign(themeGet(),p));applyTheme();}
+$('#th-mode').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setTheme({mode:b.dataset.mode});});
+$('#th-acc').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setTheme({accent:b.dataset.acc});});
+$('#th-hc').addEventListener('change',e=>setTheme({contrast:e.target.checked?'high':'normal'}));
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(themeGet().mode==='auto')applyTheme();});}catch(e){}
+applyTheme();
 /* ---------- settings sheet ---------- */
 const dlg=$('#settings');
 function openSettings(){const c=cfg();$('#set-repo').value=c?c.repo:'';$('#set-token').value='';$('#set-target').value=targetKg()||'';$('#set-token').placeholder=c?'Token saved. Leave empty to keep it':'github_pat_…';$('#set-build').textContent='App version '+BUILD;$('#set-msg').textContent='';refreshStatus();if(dlg.showModal)dlg.showModal();else dlg.setAttribute('open','');}

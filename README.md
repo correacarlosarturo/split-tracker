@@ -12,6 +12,8 @@ An offline-first workout tracker for a five-day split. It installs on an iPhone 
 |---|---|---|
 | ![Exercise card with sets, suggested weight and alternatives](docs/screenshots/log-exercise.png) | ![Stats tab in dark mode](docs/screenshots/stats-dark.png) | ![Settings with sync and backup](docs/screenshots/settings.png) |
 
+![Four themes: light clay, dark ocean, black violet, high-contrast forest](docs/screenshots/themes.png)
+
 ## What it does
 
 - **Log:** pick the day (D1 Pull, D2 Push, D3 Legs, D4 Arms and delts, D5 Chest and back), enter weight and reps per set. Every change autosaves on the phone after half a second.
@@ -20,7 +22,7 @@ An offline-first workout tracker for a five-day split. It installs on an iPhone 
 - **Stats:** muscles trained in the last 7 days on a body map, activity calendar, body weight trend, strength trends and recent workouts.
 - **Offline:** works with no signal. Logs wait on the phone and upload when a connection returns.
 - **Coach notes:** if the data repo contains `coach/YYYY-MM-DD.json`, the Log tab shows its summary for that date and uses its per-exercise weights as the suggestion.
-- **Light and dark:** follows the phone setting.
+- **Themes:** Auto, Light, Dark or true-black (OLED) mode, five accent colours (Clay, Ocean, Forest, Violet, Graphite) and a high-contrast option for bright gyms. Set in Settings and saved on the phone.
 
 ## Install on an iPhone
 
