@@ -40,10 +40,10 @@ Each exercise shows a short animation of its start and end position, the form cu
 
 Suggested weights use double progression. When every set reaches the top of the rep range, the next session suggests the next step up. Until then, it tells you to stay and add a rep.
 
-The Stats tab opens on your next session, with its first lift and target weight ready.
+The Stats tab opens on your next session, one tap from starting it.
 
 </td>
-<td width="44%"><img src="docs/screenshots/stats.png" alt="The Stats tab: next session, first lift with its animation, and workout totals"></td>
+<td width="44%"><img src="docs/screenshots/stats.png" alt="The Stats tab: next session, workout totals and the muscles trained this week"></td>
 </tr>
 <tr>
 <td width="44%"><img src="docs/screenshots/coach.png" alt="The Coach tab: weekly hard sets per muscle against target ranges"></td>
