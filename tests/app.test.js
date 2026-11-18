@@ -425,7 +425,7 @@ test('nothing in the header is drawn with filters or blur, and it sits clear of 
   const r=await page.evaluate(()=>{const fx=[...document.querySelectorAll('header, header *')].map(e=>{const s=getComputedStyle(e);return [s.filter,s.backdropFilter||s.webkitBackdropFilter||'none',s.willChange,s.transform];}).filter(v=>v[0]!=='none'||v[1]!=='none'||v[2]!=='auto'||v[3]!=='none');
     return {fx,pad:parseFloat(getComputedStyle(document.querySelector('header')).paddingTop)};});
   assert.deepEqual(r.fx,[],'no filter/backdrop/will-change/transform in the header');
-  assert.ok(r.pad>=18,'header top padding beyond the inset: '+r.pad);
+  assert.ok(r.pad>=44,'header top padding beyond the inset (clear of the iOS top-edge blur): '+r.pad);
   await ctx.close();
 });
 
