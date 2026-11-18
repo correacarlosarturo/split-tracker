@@ -215,14 +215,24 @@ const lum=c=>{const f=v=>v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4);return .
 const contrast=(a,b)=>{const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
 const theme=(mode,extra={})=>({'split-theme-v1':Object.assign({mode,accent:'clay',contrast:'normal'},extra)});
 
-test('glass: wash sits behind the page and bars blur, cards do not',async()=>{
+test('glass: wash sits behind the page, the tab bar blurs, cards and header do not',async()=>{
   const {ctx,page}=await openApp({hash:'stats',ls:theme('light')});
   const r=await page.evaluate(()=>{const bf=e=>{const s=getComputedStyle(e);return s.backdropFilter||s.webkitBackdropFilter||'none';};
     return {wash:getComputedStyle(document.body,'::before').position,header:bf(document.querySelector('header')),nav:bf(document.querySelector('.nav')),card:bf(document.querySelector('.card')),radius:getComputedStyle(document.querySelector('.card')).borderRadius};});
   assert.equal(r.wash,'fixed');
-  assert.match(r.header,/blur/);assert.match(r.nav,/blur/);
-  assert.equal(r.card,'none');
+  assert.match(r.nav,/blur/);
+  assert.equal(r.header,'none');assert.equal(r.card,'none');
   assert.equal(r.radius,'22px');
+  await ctx.close();
+});
+
+test('the header scrolls away with the page and sits on the background',async()=>{
+  const {ctx,page}=await openApp({hash:'plan',ctxOpts:{viewport:{width:390,height:700}}});
+  const r=await page.evaluate(()=>{const h=document.querySelector('header'),cs=getComputedStyle(h);window.scrollTo(0,600);
+    return {pos:cs.position,bg:cs.backgroundColor,bottom:h.getBoundingClientRect().bottom};});
+  assert.equal(r.pos,'static');
+  assert.match(r.bg,/rgba\(0, 0, 0, 0\)|transparent/);
+  assert.ok(r.bottom<0,'header scrolled out of view: '+r.bottom);
   await ctx.close();
 });
 
@@ -320,14 +330,14 @@ test('settings has a close button in the top right corner',async()=>{
   await ctx.close();
 });
 
-test('a focused input is never left under the pinned header',async()=>{
+test('a focused input is never left under the status bar strip',async()=>{
   const {ctx,page}=await openApp({hash:'log',ctxOpts:{viewport:{width:390,height:700}}});
+  await page.addStyleTag({content:'#sb-band{height:59px!important}'}); // the iPhone 15 Pro Max inset; Chromium reports 0
   const sel='input[data-ex][data-i="0"][data-f="reps"]';
-  // put the input partly underneath the header, as when the page has scrolled
-  await page.evaluate(sel=>{const h=document.querySelector('header').getBoundingClientRect().bottom,i=document.querySelector(sel).getBoundingClientRect().top;window.scrollBy(0,i-h+20);},sel);
+  await page.evaluate(sel=>{const i=document.querySelector(sel).getBoundingClientRect().top;window.scrollBy(0,i-30);},sel);
   await page.focus(sel);await page.waitForTimeout(400);
-  const r=await page.evaluate(sel=>({header:document.querySelector('header').getBoundingClientRect().bottom,input:document.querySelector(sel).getBoundingClientRect().top}),sel);
-  assert.ok(r.input>=r.header,`input top ${r.input} vs header bottom ${r.header}`);
+  const r=await page.evaluate(sel=>({band:document.querySelector('#sb-band').getBoundingClientRect().bottom,input:document.querySelector(sel).getBoundingClientRect().top}),sel);
+  assert.ok(r.input>=r.band,`input top ${r.input} vs strip bottom ${r.band}`);
   await ctx.close();
 });
 
@@ -394,12 +404,18 @@ test('the background runs under the iPhone status bar',async()=>{
   const html=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
   assert.match(html,/<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">/);
   assert.match(html,/viewport-fit=cover/);
-  // the status bar text is always white with black-translucent: light mode gets a shade behind it, dark modes do not
-  const shade={};
-  for(const mode of ['light','dark','black']){
+  // a fixed strip behind the clock keeps scrolled content from showing through it; it fades, it does not blur.
+  // iOS draws the clock in white here, so light mode's strip carries the accent shade.
+  const band={};
+  for(const mode of ['light','dark']){
     const {ctx,page}=await openApp({hash:'stats',ls:theme(mode)});
-    shade[mode]=await page.$eval('header',h=>getComputedStyle(h,'::before').content!=='none'&&getComputedStyle(h,'::before').display!=='none');
+    band[mode]=await page.$eval('#sb-band',b=>{const cs=getComputedStyle(b);return {pos:cs.position,top:cs.top,pe:cs.pointerEvents,img:cs.backgroundImage,bf:cs.backdropFilter||cs.webkitBackdropFilter||'none'};});
     await ctx.close();
   }
-  assert.deepEqual(shade,{light:true,dark:false,black:false});
+  for(const m of ['light','dark']){
+    assert.equal(band[m].pos,'fixed');assert.equal(band[m].top,'0px');assert.equal(band[m].pe,'none');
+    assert.match(band[m].img,/gradient/);assert.equal(band[m].bf,'none');
+  }
+  assert.notEqual(band.light.img,band.dark.img,'light strip carries the accent shade');
 });
+
