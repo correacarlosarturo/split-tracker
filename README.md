@@ -1,28 +1,78 @@
-# Split
+<p align="center">
+  <img src="docs/screenshots/hero.png" alt="Split on three phones: the Log tab, the Stats tab and Stats in dark mode" width="100%">
+</p>
 
-An offline-first workout tracker for a five-day split. It installs on an iPhone home screen, saves every set on the phone the moment you type it, and then copies your logs to a private GitHub repo so a coach (human or Claude) can read them.
+<h1 align="center">Split</h1>
 
-> Screenshots use made-up demo data.
+<p align="center">
+  <b>A five-day split workout tracker for your phone.</b><br>
+  Log every set offline, get the next weight to lift, and keep a private copy of your logs on GitHub that you, or a coach, can read.
+</p>
 
-| Stats | Activity | Log |
-|---|---|---|
-| ![Stats tab with recovery map](docs/screenshots/stats-light.png) | ![Activity calendar and trends](docs/screenshots/stats-activity.png) | ![Log tab with a daily coach note](docs/screenshots/log.png) |
+<p align="center">
+  <a href="#install-on-an-iphone">Install</a> ·
+  <a href="#turn-on-cloud-sync-optional">Sync</a> ·
+  <a href="#develop">Develop</a> ·
+  <a href="#privacy">Privacy</a>
+</p>
 
-| Exercise card | Dark mode | Settings |
-|---|---|---|
-| ![Exercise card with sets, suggested weight and alternatives](docs/screenshots/log-exercise.png) | ![Stats tab in dark mode](docs/screenshots/stats-dark.png) | ![Settings with sync and backup](docs/screenshots/settings.png) |
+> The screens below use made-up demo data.
 
-![Four themes: light clay, dark ocean, black violet, high-contrast forest](docs/screenshots/themes.png)
+<table>
+<tr>
+<td width="44%"><img src="docs/screenshots/log.png" alt="An exercise card on the Log tab with its animation, cue and suggested weight"></td>
+<td>
 
-## What it does
+### Log a set in seconds
 
-- **Log:** pick the day (D1 Pull, D2 Push, D3 Legs, D4 Arms and delts, D5 Chest and back), enter weight and reps per set. Every change autosaves on the phone after half a second.
-- **Suggested weights:** double progression. When every set reaches the top of the rep range, the next session suggests the next step up.
-- **Gym busy?** Each exercise lists alternatives (cable, machine, dumbbell, band). Logging one keeps its history separate from the original lift.
-- **Stats:** muscles trained in the last 7 days on a body map, activity calendar, body weight trend, strength trends and recent workouts.
-- **Offline:** works with no signal. Logs wait on the phone and upload when a connection returns.
-- **Coach notes:** if the data repo contains `coach/YYYY-MM-DD.json`, the Log tab shows its summary for that date and uses its per-exercise weights as the suggestion.
-- **Themes:** Auto, Light, Dark or true-black (OLED) mode, five accent colours (Clay, Ocean, Forest, Violet, Graphite) and a high-contrast option for bright gyms. Set in Settings and saved on the phone.
+Pick the day (D1 Pull, D2 Push, D3 Legs, D4 Arms and delts, D5 Chest and back) and enter weight and reps. Every change saves on the phone half a second after you type, with or without signal.
+
+Each exercise shows a short animation of its start and end position, the form cue, and what you lifted last time. With Reduce Motion turned on, the animation holds still and a tap switches between the two positions.
+
+**Gym busy?** Every lift lists alternatives (cable, machine, dumbbell, band). Logging one keeps its history separate from the original.
+
+</td>
+</tr>
+<tr>
+<td>
+
+### The next weight, worked out for you
+
+Suggested weights use double progression. When every set reaches the top of the rep range, the next session suggests the next step up. Until then, it tells you to stay and add a rep.
+
+The Stats tab opens on your next session, with its first lift and target weight ready.
+
+</td>
+<td width="44%"><img src="docs/screenshots/stats.png" alt="The Stats tab: next session, first lift with its animation, and workout totals"></td>
+</tr>
+<tr>
+<td width="44%"><img src="docs/screenshots/coach.png" alt="The Coach tab: weekly hard sets per muscle against target ranges"></td>
+<td>
+
+### See what you actually trained
+
+- A body map of the muscles worked in the last 7 days
+- An activity calendar for the week, the calendar month or longer ranges
+- A body weight trend and estimated one-rep-max progress per lift
+- Weekly hard sets per muscle, set against the usual target ranges
+
+</td>
+</tr>
+<tr>
+<td>
+
+### A coach in the loop
+
+If your data repo has `coach/YYYY-MM-DD.json`, the Log tab shows its note for that day and uses its per-exercise weights as the suggestion. A human coach or Claude can write those files after reading your sessions.
+
+### Looks right in the gym
+
+Liquid Glass styling in Auto, Light, Dark or Black mode, with five accent colours. The background is a soft gradient in whichever accent you pick. High contrast turns the glass solid for bright gyms.
+
+</td>
+<td width="44%"><img src="docs/screenshots/dark.png" alt="The Stats tab in dark mode with the Ocean accent"></td>
+</tr>
+</table>
 
 ## Install on an iPhone
 
@@ -98,7 +148,15 @@ Tests run the built app in a headless browser against a fake GitHub API (needs N
 ```
 npm i --no-save playwright && npx playwright install chromium
 python3 src/build.py && node --test tests/app.test.js
-``` Commit and push, and GitHub Pages redeploys in a minute or two. The service worker serves the cached copy when offline and the fresh copy when online.
+```
+
+The README images are rendered from the built app with made-up demo data, so they can be redrawn after any change:
+
+```
+python3 src/build.py && node tools/readme-shots.js
+```
+
+Commit and push, and GitHub Pages redeploys in a minute or two. The service worker serves the cached copy when offline and the fresh copy when online.
 
 Plan data (exercises, sets, rep ranges, start weights) lives in `src/data.js`, and the alternatives in `src/alts.js`.
 

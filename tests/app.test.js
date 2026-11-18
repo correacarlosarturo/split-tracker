@@ -51,8 +51,9 @@ function fakeGitHub(files,opts={}){
   return {files,repo,calls,handler};
 }
 
-async function openApp({ls={},gh,hash='log'}={}){
-  const ctx=await browser.newContext({serviceWorkers:'block'});
+async function openApp({ls={},gh,hash='log',ctxOpts={},before}={}){
+  const ctx=await browser.newContext(Object.assign({serviceWorkers:'block'},ctxOpts));
+  if(before)await before(ctx);
   const errors=[];
   if(gh)await ctx.route('https://api.github.com/**',gh.handler);
   await ctx.addInitScript(entries=>{if(!sessionStorage.getItem('seeded')){sessionStorage.setItem('seeded','1');for(const k in entries)localStorage.setItem(k,entries[k]);}},Object.fromEntries(Object.entries(ls).map(([k,v])=>[k,JSON.stringify(v)])));
@@ -191,5 +192,151 @@ test('Month activity is the calendar month, not the last 30 days',async()=>{
   const daysInMonth=new Date(Number(first.slice(0,4)),Number(first.slice(5,7)),0).getDate();
   assert.deepEqual(nums,Array.from({length:daysInMonth},(_,i)=>i+1));
   assert.deepEqual(errors,[]);
+  await ctx.close();
+});
+
+/* ---------- Liquid Glass ---------- */
+// Resolve any CSS colour (including color-mix and custom properties) to [r,g,b,a] in 0..1 inside the page.
+async function tokenColors(page,names){
+  return page.evaluate(names=>{
+    const out={},el=document.createElement('i');document.body.appendChild(el);
+    for(const n of names){
+      el.style.color='';el.style.color='var('+n+')';
+      const c=getComputedStyle(el).color;let m;
+      if((m=c.match(/^rgba?\(([^)]+)\)/))){const p=m[1].split(/[ ,/]+/).filter(Boolean).map(Number);out[n]=[p[0]/255,p[1]/255,p[2]/255,p.length>3?p[3]:1];}
+      else if((m=c.match(/^color\(srgb ([^)]+)\)/))){const p=m[1].split(/[ /]+/).filter(Boolean).map(Number);out[n]=[p[0],p[1],p[2],p.length>3?p[3]:1];}
+      else out[n]=null;
+    }
+    el.remove();return out;
+  },names);
+}
+const over=(top,bot)=>{const a=top[3]+bot[3]*(1-top[3]);return [0,1,2].map(i=>(top[i]*top[3]+bot[i]*bot[3]*(1-top[3]))/a).concat([a]);};
+const lum=c=>{const f=v=>v<=.03928?v/12.92:Math.pow((v+.055)/1.055,2.4);return .2126*f(c[0])+.7152*f(c[1])+.0722*f(c[2]);};
+const contrast=(a,b)=>{const x=lum(a),y=lum(b);return (Math.max(x,y)+.05)/(Math.min(x,y)+.05);};
+const theme=(mode,extra={})=>({'split-theme-v1':Object.assign({mode,accent:'clay',contrast:'normal'},extra)});
+
+test('glass: wash sits behind the page and bars blur, cards do not',async()=>{
+  const {ctx,page}=await openApp({hash:'stats',ls:theme('light')});
+  const r=await page.evaluate(()=>{const bf=e=>{const s=getComputedStyle(e);return s.backdropFilter||s.webkitBackdropFilter||'none';};
+    return {wash:getComputedStyle(document.body,'::before').position,header:bf(document.querySelector('header')),nav:bf(document.querySelector('.nav')),card:bf(document.querySelector('.card')),radius:getComputedStyle(document.querySelector('.card')).borderRadius};});
+  assert.equal(r.wash,'fixed');
+  assert.match(r.header,/blur/);assert.match(r.nav,/blur/);
+  assert.equal(r.card,'none');
+  assert.equal(r.radius,'22px');
+  await ctx.close();
+});
+
+test('glass: text contrast holds in light, dark and black',{timeout:120000},async()=>{
+  for(const mode of ['light','dark','black'])for(const accent of ['clay','ocean','forest','violet','graphite']){
+    const {ctx,page}=await openApp({hash:'stats',ls:theme(mode,{accent})});
+    const c=await tokenColors(page,['--bg','--ink','--muted','--accent','--warn','--glass','--wash-1','--wash-2','--wash-3']);
+    for(const k in c)assert.ok(c[k],mode+' '+k+' resolves to a colour');
+    for(const w of [null,c['--wash-1'],c['--wash-2'],c['--wash-3']]){
+      const ground=w?over(w,c['--bg']):c['--bg'],surf=over(c['--glass'],ground);
+      for(const ink of ['--ink','--muted','--accent','--warn']){
+        const r=contrast(c[ink],surf);
+        assert.ok(r>=4.5,`${mode}/${accent}: ${ink} on glass over ${w?'wash':'bg'} is ${r.toFixed(2)}:1`);
+      }
+    }
+    await ctx.close();
+  }
+});
+
+test('glass: the background gradient follows the accent in every mode',async()=>{
+  for(const mode of ['light','dark','black']){
+    const got={};
+    for(const accent of ['clay','ocean']){
+      const {ctx,page}=await openApp({hash:'stats',ls:theme(mode,{accent})});
+      got[accent]=await tokenColors(page,['--wash-1','--wash-2','--wash-3']);
+      await ctx.close();
+    }
+    for(const w of ['--wash-1','--wash-2','--wash-3']){
+      assert.notDeepEqual(got.clay[w].slice(0,3).map(v=>v.toFixed(2)),got.ocean[w].slice(0,3).map(v=>v.toFixed(2)),mode+' '+w+' changes with the accent');
+      assert.ok(got.clay[w][3]>=(mode==='black'?.3:.2),mode+' '+w+' is visible (alpha '+got.clay[w][3]+')');
+    }
+  }
+});
+
+test('glass: high contrast is solid',async()=>{
+  for(const mode of ['light','dark']){
+    const {ctx,page}=await openApp({hash:'stats',ls:theme(mode,{contrast:'high'})});
+    const r=await page.evaluate(()=>{const bf=e=>{const s=getComputedStyle(e);return s.backdropFilter||s.webkitBackdropFilter||'none';};return [bf(document.querySelector('header')),bf(document.querySelector('.nav'))];});
+    assert.deepEqual(r,['none','none'],mode);
+    const c=await tokenColors(page,['--glass','--glass-bar']);
+    assert.equal(c['--glass'][3],1,mode+' --glass opaque');assert.equal(c['--glass-bar'][3],1,mode+' --glass-bar opaque');
+    await ctx.close();
+  }
+});
+
+test('glass: falls back when backdrop-filter is unsupported',async()=>{
+  const html=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
+  const m=html.match(/@supports not \(\(backdrop-filter:\s*blur\(1px\)\) or \(-webkit-backdrop-filter:\s*blur\(1px\)\)\)\s*\{([\s\S]*?)\}\s*\}/);
+  assert.ok(m,'fallback block present');
+  const a=m[1].match(/--glass-bar:\s*rgba\([^)]*,\s*([\d.]+)\)/);
+  assert.ok(a&&Number(a[1])>=.92,'--glass-bar alpha >= .92');
+});
+
+test('stats shows an animated preview of the next lift',async()=>{
+  const {ctx,page,errors}=await openApp({hash:'stats'});
+  assert.equal(await page.$$eval('.nextlift .fx img',n=>n.length),2);
+  assert.match(await page.textContent('.nextlift'),/Lat pulldown/);
+  assert.match(await page.textContent('.nextlift'),/Next: 55 kg/);
+  assert.equal(await page.$eval('.nextlift .fx img+img',i=>getComputedStyle(i).animationName),'fx');
+  assert.deepEqual(errors,[]);
+  await ctx.close();
+});
+
+test('the preview obeys reduced motion and tap',async()=>{
+  const {ctx,page}=await openApp({hash:'stats',ctxOpts:{reducedMotion:'reduce'}});
+  assert.equal(await page.$eval('.nextlift .fx img+img',i=>getComputedStyle(i).animationName),'none');
+  await page.click('.nextlift .fx');
+  assert.ok(await page.$eval('.nextlift .fx',f=>f.classList.contains('end')));
+  await ctx.close();
+});
+
+test('the preview survives a lift without images',async()=>{
+  const before=ctx=>ctx.route('**/split.js*',async route=>{
+    const r=await route.fetch();const body=(await r.text()).replace('"d1-lat":"lat-pulldown",','');
+    await route.fulfill({response:r,body});
+  });
+  const {ctx,page,errors}=await openApp({hash:'stats',before});
+  assert.match(await page.textContent('.nextlift'),/Lat pulldown/);
+  assert.equal(await page.$$eval('.nextlift img',n=>n.length),0);
+  assert.deepEqual(errors,[]);
+  await ctx.close();
+});
+
+test('readme renders exist and are framed phones',{timeout:180000},async()=>{
+  const {spawnSync}=require('node:child_process'),os=require('node:os');
+  const out=fs.mkdtempSync(path.join(os.tmpdir(),'shots-'));
+  const r=spawnSync(process.execPath,[path.join(ROOT,'tools','readme-shots.js'),out],{encoding:'utf8',timeout:170000});
+  assert.equal(r.status,0,r.stderr||r.stdout);
+  const size=f=>{const b=fs.readFileSync(path.join(out,f));assert.equal(b.toString('ascii',1,4),'PNG',f);return [b.readUInt32BE(16),b.readUInt32BE(20)];};
+  assert.deepEqual(size('hero.png'),[1600,900]);
+  for(const f of ['stats.png','log.png','coach.png','dark.png'])assert.deepEqual(size(f),[900,1500],f);
+  fs.rmSync(out,{recursive:true,force:true});
+});
+
+test('glass: the no-blur fallback makes bars near-opaque in every mode',async()=>{
+  const html=fs.readFileSync(path.join(ROOT,'index.html'),'utf8');
+  const m=html.match(/@supports not \(\(backdrop-filter:\s*blur\(1px\)\) or \(-webkit-backdrop-filter:\s*blur\(1px\)\)\)\s*\{([\s\S]*?\})\s*\}/);
+  assert.ok(m,'fallback block present');
+  for(const mode of ['light','dark','black']){
+    const {ctx,page}=await openApp({hash:'stats',ls:theme(mode)});
+    await page.addStyleTag({content:m[1]}); // apply the fallback as an unsupporting browser would
+    const c=await tokenColors(page,['--glass-bar']);
+    assert.ok(c['--glass-bar'][3]>=.92,mode+' --glass-bar alpha '+c['--glass-bar'][3]);
+    if(mode==='black')assert.ok(c['--glass-bar'].slice(0,3).every(v=>v<.05),'black fallback stays black');
+    await ctx.close();
+  }
+});
+
+test('the preview keeps full width when the lift has no image',async()=>{
+  const before=ctx=>ctx.route('**/split.js*',async route=>{
+    const r=await route.fetch();await route.fulfill({response:r,body:(await r.text()).replace('"d1-lat":"lat-pulldown",','')});
+  });
+  const {ctx,page}=await openApp({hash:'stats',before});
+  const w=await page.$eval('.nextlift',c=>({card:c.getBoundingClientRect().width,info:c.querySelector('.nli').getBoundingClientRect().width}));
+  assert.ok(w.info>w.card*.8,`info column ${w.info}px of ${w.card}px card`);
   await ctx.close();
 });

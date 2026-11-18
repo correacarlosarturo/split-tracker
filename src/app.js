@@ -500,6 +500,12 @@ function progressHtml(){
     const d=r.p.map((q,i)=>(i?'L':'M')+(i/(r.p.length-1)*60).toFixed(1)+' '+(16-(q.v-lo)/sp*14).toFixed(1)).join('');
     return`<div class="prow"><b>${r.n}</b><svg viewBox="0 0 60 18" aria-hidden="true"><path d="${d}"/></svg><em class="${r.pc>=0?'up':'dn'}">${r.pc>=0?'+':''}${r.pc.toFixed(0)}%</em></div>`;}).join('')}</div><p class="sub">Estimated 1-rep max, first vs latest session.</p>`;
 }
+/* the first lift of the next session, with its start/end animation */
+function nextLiftHtml(){
+  const day=suggestedDay(),ex=EX.find(e=>e.d===day);if(!ex)return'';
+  const sg=suggest(ex,todayStr(),null);
+  return`<section class="card nextlift"><h3 class="sec">First lift · ${esc(day)}</h3><div class="nlb">${figHtml(ex)}<div class="nli"><b>${esc(ex.n)}</b><p class="sub">${ex.s} × ${ex.r[0]}–${ex.r[1]} · ${esc(ex.u)}</p><p class="tgt"><b>Next: ${fmtKg(sg.kg)} kg</b></p><p class="cue">${esc(ex.cue)}</p></div></div></section>`;
+}
 function renderStats(){
   const root=$('#tab-stats'),sess=activeSessions(),now=Date.now(),win=7;
   const H=heat(sess,now,win),list=realList(),mo=todayStr().slice(0,7);
@@ -508,7 +514,7 @@ function renderStats(){
     const a=H[m].sets<=0?0:clamp(.18+.82*H[m].sets/Math.max(BAND[m][1],6),.18,1);
     return a===0?'var(--idle)':`color-mix(in srgb,var(--clay) ${Math.round(a*100)}%,var(--idle))`;
   };
-  let h=`<section class="hd"><h2>Stats</h2><p class="sub">Progress &amp; history</p><div class="next"><div><span>Next up</span><b>${(()=>{const d=DAYS.find(x=>x.id===suggestedDay());return d.id+' · '+d.name;})()}</b></div><button class="cta" data-tab="log">Start session</button></div></section>
+  let h=`<section class="hd"><h2>Stats</h2><p class="sub">Progress &amp; history</p><div class="next"><div><span>Next up</span><b>${(()=>{const d=DAYS.find(x=>x.id===suggestedDay());return d.id+' · '+d.name;})()}</b></div><button class="cta" data-tab="log">Start session</button></div></section>${nextLiftHtml()}
   <div class="tiles"><div class="tile"><span>${icon('dumb')}Workouts</span><b>${list.length}</b></div><div class="tile"><span>${icon('cal')}This month</span><b>${list.filter(s=>s.date.slice(0,7)===mo).length}</b></div><div class="tile"><span>${icon('flame')}Week streak</span><b>${weekStreak()}</b></div><div class="tile"><span>${icon('scale')}Weight 30d</span><b>${wd===null?'–':(wd>0?'+':'')+wd.toFixed(1)+' kg'}</b></div></div>
   <section class="card"><h3 class="sec">Sets trained · last 7 days</h3>
   ${state.real?'':'<p class="banner">Sample week shown on the body map. Save your first session in the Log tab and this switches to your own data.</p>'}

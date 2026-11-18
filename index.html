@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Split"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" id="tc" content="#faf9f5">
-<script src="theme.js?v=2026-11-18.120017"></script>
+<script src="theme.js?v=2026-11-18.124631"></script>
 <style>
 /* Layout: one narrow column, sticky header, bottom tab bar. Palette: graphite with indigo accent; heat uses its own red-to-green scale. */
 /* Look: warm paper, clay accent, serif display + system sans, quiet hairline cards (follows the iPhone light/dark setting) */
@@ -288,7 +288,7 @@ dialog#settings::backdrop{background:rgba(0,0,0,.45)}
 /* ---------- themes: html[data-scheme] light|dark|black, [data-accent], [data-contrast] ---------- */
 html[data-scheme="light"]{--bg:#faf9f5;--surface:#fff;--inset:#f3f1ea;--ink:#141413;--muted:#6b6a64;--line:#e6e3d8;--accent:#c4573a;--accent-ink:#fff;--soft:#f6e6de;--good:#5f8a63;--warn:#a8741a;--bad:#b5412f;--body:#ebe8dd;--idle:#e4e1d6;--clay:#c96442;--sand:#e3b99a;--sage:#8fb08f;--fig:#141413;--eq:#c4573a;--shadow:none;color-scheme:light}
 html[data-scheme="dark"]{--bg:#262624;--surface:#30302e;--inset:#262624;--ink:#faf9f5;--muted:#a9a79d;--line:#444440;--accent:#d97757;--accent-ink:#1f1e1d;--soft:#4a362d;--good:#8db48d;--warn:#e0a653;--bad:#e5786a;--body:#3a3936;--idle:#454440;--clay:#d97757;--sand:#b98c6b;--sage:#7fa27f;--fig:#faf9f5;--eq:#d97757;color-scheme:dark}
-html[data-scheme="black"]{--bg:#262624;--surface:#30302e;--inset:#262624;--ink:#faf9f5;--muted:#a9a79d;--line:#444440;--accent:#d97757;--accent-ink:#1f1e1d;--soft:#4a362d;--good:#8db48d;--warn:#e0a653;--bad:#e5786a;--body:#3a3936;--idle:#454440;--clay:#d97757;--sand:#b98c6b;--sage:#7fa27f;--fig:#faf9f5;--eq:#d97757;color-scheme:dark--bg:#000;--surface:#0f0f0f;--inset:#181818;--line:#2c2c2c;--body:#1b1b1b;--idle:#262626}
+html[data-scheme="black"]{--bg:#262624;--surface:#30302e;--inset:#262624;--ink:#faf9f5;--muted:#a9a79d;--line:#444440;--accent:#d97757;--accent-ink:#1f1e1d;--soft:#4a362d;--good:#8db48d;--warn:#e0a653;--bad:#e5786a;--body:#3a3936;--idle:#454440;--clay:#d97757;--sand:#b98c6b;--sage:#7fa27f;--fig:#faf9f5;--eq:#d97757;color-scheme:dark;--bg:#000;--surface:#0f0f0f;--inset:#181818;--line:#2c2c2c;--body:#1b1b1b;--idle:#262626}
 html[data-accent="clay"][data-scheme="light"]{--acc:#c4573a;--acc-clay:#c96442;--acc-soft:#f6e6de}
 html[data-accent="clay"][data-scheme="dark"],html[data-accent="clay"][data-scheme="black"]{--acc:#d97757;--acc-clay:#d97757;--acc-soft:#4a362d}
 html[data-accent="ocean"][data-scheme="light"]{--acc:#2a68a8;--acc-clay:#3b79ba;--acc-soft:#e0ebf7}
@@ -320,6 +320,81 @@ html[data-contrast="high"] .btn,html[data-contrast="high"] input[type=text],html
 #gear{flex:none;width:44px;height:44px;margin:-8px -12px -8px 0;display:inline-flex;align-items:center;justify-content:center;border:0;background:none;color:var(--ink);border-radius:50%;cursor:pointer}
 #gear:active{background:var(--inset)}
 header .in h1{flex:none;white-space:nowrap}header .in #sync{flex:1 1 auto;min-width:0;text-align:right}
+
+/* =================== Liquid Glass =================== */
+/* A fixed colour wash (tinted by the accent) sits behind everything. Cards are translucent with a bright top edge but
+   no blur: the wash behind them never moves, so blur would look identical and cost battery. Real backdrop blur is
+   used only where content scrolls underneath: the header, the tab bar, the settings sheet and the toast. */
+html,html[data-scheme="light"]{--disp:var(--sans);--radius-card:22px;--radius-pill:999px;
+  --bg:#eceef4;--surface:#fff;--ink:#121216;--muted:#4a4a53;--line:rgba(20,20,45,.10);--inset:rgba(255,255,255,.55);
+  --glass:rgba(255,255,255,.52);--glass-bar:rgba(255,255,255,.66);--glass-edge:rgba(255,255,255,.78);--glass-hi:rgba(255,255,255,.95);--glass-sel:rgba(255,255,255,.72);--glass-shade:rgba(28,30,60,.10);
+  --wash-1:color-mix(in srgb,var(--acc,#c4573a) 40%,transparent);--wash-2:color-mix(in srgb,var(--acc-clay,#c96442) 26%,transparent);--wash-3:color-mix(in srgb,color-mix(in srgb,var(--acc,#c4573a) 55%,#fff) 45%,transparent);
+  --idle:rgba(20,20,45,.07);--body:rgba(20,20,45,.10);--blur:blur(24px) saturate(180%);
+  /* accent and warning text darkened a step so they keep 4.5:1 on light glass */
+  --accent:color-mix(in srgb,var(--acc,#c4573a) 80%,#000);--warn:#7a5008}
+html[data-scheme="dark"]{--bg:#101116;--accent:color-mix(in srgb,var(--acc,#d97757) 78%,#fff);--surface:#1c1d24;--ink:#f3f3f6;--muted:#b4b4be;--line:rgba(255,255,255,.10);--inset:rgba(255,255,255,.07);
+  --glass:rgba(38,39,50,.48);--glass-bar:rgba(30,31,40,.62);--glass-edge:rgba(255,255,255,.13);--glass-hi:rgba(255,255,255,.16);--glass-sel:rgba(255,255,255,.14);--glass-shade:rgba(0,0,0,.40);
+  --wash-1:color-mix(in srgb,var(--acc,#d97757) 36%,transparent);--wash-2:color-mix(in srgb,var(--acc-clay,#d97757) 24%,transparent);--wash-3:color-mix(in srgb,var(--acc-soft,#4a362d) 70%,transparent);
+  --idle:rgba(255,255,255,.08);--body:rgba(255,255,255,.10)}
+html[data-scheme="black"]{--bg:#000;--accent:color-mix(in srgb,var(--acc,#d97757) 78%,#fff);--surface:#0e0e10;--ink:#f3f3f6;--muted:#a6a6b0;--line:rgba(255,255,255,.10);--inset:rgba(255,255,255,.07);
+  --glass:rgba(26,26,30,.58);--glass-bar:rgba(18,18,22,.70);--glass-edge:rgba(255,255,255,.11);--glass-hi:rgba(255,255,255,.12);--glass-sel:rgba(255,255,255,.13);--glass-shade:rgba(0,0,0,.6);
+  --wash-1:color-mix(in srgb,var(--acc,#d97757) 44%,transparent);--wash-2:color-mix(in srgb,var(--acc-clay,#d97757) 32%,transparent);--wash-3:color-mix(in srgb,var(--acc-soft,#4a362d) 80%,transparent);
+  --idle:rgba(255,255,255,.08);--body:rgba(255,255,255,.10)}
+body{background:var(--bg)}
+body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
+  background:radial-gradient(110% 55% at 0% 0%,var(--wash-1),transparent 62%),radial-gradient(90% 50% at 100% 38%,var(--wash-2),transparent 62%),radial-gradient(100% 55% at 30% 100%,var(--wash-3),transparent 62%)}
+h1,h2,h3{font-family:var(--sans);font-weight:700;letter-spacing:-.02em}
+h2,.hd h2{font-size:32px;line-height:1.1}
+.card,.tile,.next,.kpis div,.coachnote{background:var(--glass);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-hi),0 8px 24px var(--glass-shade)}
+.card,.tile{border-radius:var(--radius-card)}
+.next{border-radius:var(--radius-pill)}
+.next b,.big,.tile b,.kpis b,.set .n,.daybtn b{font-family:var(--sans);font-weight:700;letter-spacing:-.01em}
+.big{color:var(--accent)}
+.coachnote{border-left:3px solid var(--accent)}
+.dd{padding:0}
+header{position:sticky;top:0;z-index:7;background:var(--glass-bar);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border-bottom:1px solid var(--glass-edge);padding:calc(8px + env(safe-area-inset-top)) 20px 8px}
+header h1{font:600 15px var(--sans);color:var(--ink);letter-spacing:-.01em}
+main{padding-top:14px}
+.nav{bottom:calc(14px + env(safe-area-inset-bottom));width:min(calc(100% - 28px),420px);background:var(--glass-bar);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-hi),0 10px 30px var(--glass-shade)}
+.nav button.on{background:var(--glass-sel);color:var(--accent);font-weight:600}
+.btn,.cta,.lnk,.mchip,.alt .btn.mini{border-radius:var(--radius-pill)}
+.btn{background:var(--inset);border:1px solid var(--glass-edge)}
+.btn.primary,.cta{background:var(--accent);border-color:transparent;color:var(--accent-ink);box-shadow:inset 0 1px 0 rgba(255,255,255,.28)}
+input[type=text],input[type=date],textarea{background:var(--inset);border:1px solid var(--glass-edge);border-radius:12px}
+input:focus,textarea:focus{border-color:var(--accent)}
+.seg{background:var(--inset);border:1px solid var(--glass-edge);border-radius:var(--radius-pill)}
+.seg button{border-radius:var(--radius-pill)}
+.seg button.on{background:var(--glass-sel);box-shadow:inset 0 1px 0 var(--glass-hi),0 2px 6px var(--glass-shade)}
+.daybtn,.rbtn,.mrow,.alt,.chip{background:var(--inset);border:1px solid var(--glass-edge)}
+.daybtn{border-radius:16px}.rbtn,.mrow,.alt{border-radius:16px}
+.daybtn.on{background:var(--accent);border-color:transparent}
+.tag{border-color:var(--glass-edge);background:var(--inset)}
+.vb,.mc{background:var(--inset)}
+dialog#settings{background:var(--glass-bar);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--glass-edge);border-radius:28px;box-shadow:inset 0 1px 0 var(--glass-hi),0 20px 60px var(--glass-shade)}
+dialog#settings::backdrop{background:rgba(0,0,0,.30)}
+#settings h2{font:700 24px var(--sans)}
+#settings input[type=text],#settings input[type=password]{background:var(--inset);border:1px solid var(--glass-edge)}
+#settings .btn{background:var(--inset);border:1px solid var(--glass-edge)}
+#settings .btn.primary{background:var(--accent);border-color:transparent;color:var(--accent-ink)}
+#settings .seg button.on{background:var(--accent);color:var(--accent-ink)}
+#toast{background:var(--glass-bar);color:var(--ink);-webkit-backdrop-filter:var(--blur);backdrop-filter:var(--blur);border:1px solid var(--glass-edge);box-shadow:0 10px 30px var(--glass-shade)}
+/* exercise animation frames: glass edge around the start/end cross-fade */
+.fx{border-radius:var(--radius-card);border:1px solid var(--glass-edge);box-shadow:inset 0 1px 0 var(--glass-hi),0 6px 18px var(--glass-shade);background:var(--inset)}
+.alt img{border-radius:14px;border:1px solid var(--glass-edge)}
+.nlb{display:grid;grid-template-columns:132px 1fr;gap:14px;align-items:center}
+.nlb .fx{max-width:132px;margin:0}
+.nlb:not(:has(.fx)){grid-template-columns:1fr}
+.nli b{font:700 19px var(--sans);letter-spacing:-.01em}.nli .sub{margin:2px 0 6px;font-size:14px}.nli .tgt{margin:0 0 6px;font-size:15px}.nli .cue{margin:0;font-size:13.5px;color:var(--muted)}
+/* no backdrop-filter support: bars go near-opaque so text under them stays readable */
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  html,html[data-scheme="light"]{--glass-bar:rgba(246,247,250,.96)}
+  html[data-scheme="dark"]{--glass-bar:rgba(22,23,30,.96)}
+  html[data-scheme="black"]{--glass-bar:rgba(6,6,8,.96)}
+}
+/* high contrast: solid surfaces, no translucency, no blur, no wash */
+html[data-contrast="high"]{--glass:var(--surface);--glass-bar:var(--surface);--glass-sel:var(--inset);--glass-edge:var(--line);--glass-hi:transparent;--inset:var(--bg)}
+html[data-contrast="high"] header,html[data-contrast="high"] .nav,html[data-contrast="high"] dialog#settings,html[data-contrast="high"] #toast{-webkit-backdrop-filter:none;backdrop-filter:none}
+html[data-contrast="high"] body::before{display:none}
 </style>
 </head>
 <body>
@@ -355,6 +430,6 @@ header .in h1{flex:none;white-space:nowrap}header .in #sync{flex:1 1 auto;min-wi
 <button data-tab="coach"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h12M8 12h12M8 17h12M4 7h.01M4 12h.01M4 17h.01"/></svg>Coach</button>
 </div></nav>
 <div id="toast" role="status" aria-live="polite"></div>
-<script src="split.js?v=2026-11-18.120017"></script>
+<script src="split.js?v=2026-11-18.124631"></script>
 </body>
 </html>
