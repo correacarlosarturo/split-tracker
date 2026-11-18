@@ -403,6 +403,13 @@ header .brand h1{font:700 21px var(--sans);letter-spacing:-.02em;color:var(--ink
 #gear #sync[data-s="synced"]{background:var(--good)}#gear #sync[data-s="error"]{background:var(--bad)}
 .glassrow{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted)}
 .glassrow input{flex:1;min-width:0;accent-color:var(--accent);height:32px}
+/* temporary: a ruler of lines every 4px from the top of the page, to measure the band iOS blurs */
+#ruler{position:fixed;inset:0;z-index:50;background:var(--bg);color:var(--ink);overflow:hidden;cursor:pointer}
+#ruler[hidden]{display:none}
+#ruler div{position:absolute;left:0;right:0;height:4px;border-top:1px solid var(--ink)}
+#ruler div:nth-child(even){border-top-color:var(--accent)}
+#ruler span{position:absolute;top:-6px;padding:1px 4px;background:var(--bg);font:600 10px/1 var(--sans);font-variant-numeric:tabular-nums}
+#ruler p{position:absolute;top:150px;left:16px;right:16px;margin:0;font-size:16px}
 /* no backdrop-filter support: bars go near-opaque so text under them stays readable */
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   html,html[data-scheme="light"]{--glass-bar:rgba(246,247,250,.96);--glass-sheet:rgba(246,247,250,.97)}
@@ -416,6 +423,7 @@ html[data-contrast="high"] body::before{display:none}
 </style>
 </head>
 <body>
+<div id="ruler" hidden></div>
 <header><div class="in"><div class="brand"><svg class="appicon" viewBox="0 0 24 24" aria-hidden="true"><rect class="tile-bg" width="24" height="24" rx="5.5"/><g class="bell"><rect x="2.8" y="8.8" width="1.9" height="6.4" rx=".95"/><rect x="4.5" y="7" width="2.6" height="10" rx="1.3"/><rect x="7" y="11.1" width="10" height="1.8" rx=".9"/><rect x="16.9" y="7" width="2.6" height="10" rx="1.3"/><rect x="19.3" y="8.8" width="1.9" height="6.4" rx=".95"/></g></svg><h1>Split</h1></div><button id="gear" type="button" aria-label="Settings"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1.04 1.56V21a2 2 0 1 1-4 0v-.09A1.7 1.7 0 0 0 9 19.4a1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1.04H3a2 2 0 1 1 0-4h.09A1.7 1.7 0 0 0 4.6 9a1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1.04-1.56V3a2 2 0 1 1 4 0v.09A1.7 1.7 0 0 0 15 4.6a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.7 1.7 0 0 0 19.4 9a1.7 1.7 0 0 0 1.56 1.04H21a2 2 0 1 1 0 4h-.09A1.7 1.7 0 0 0 19.4 15Z"/></svg><span id="sync" data-s="warn">Starting…</span></button></div></header>
 <dialog id="settings"><button id="set-x" type="button" aria-label="Close settings"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button><h2>Settings</h2><p id="set-status"></p>
 <h3>Cloud sync</h3><p class="sub" style="margin:0;font-size:13px;color:var(--muted)">Your workouts always save on this phone first. Sync copies them to your private GitHub repo so Claude can read them.</p>
@@ -434,6 +442,7 @@ html[data-contrast="high"] body::before{display:none}
 <label class="hcrow" for="th-hc"><span>High contrast (easier to read in bright light)</span><input type="checkbox" id="th-hc"></label>
 <h3>Goal</h3><label for="set-target">Target body weight, kg (stays on this phone)</label><input id="set-target" type="text" inputmode="decimal" placeholder="optional">
 <h3>Backup</h3><div class="row"><button class="btn" id="set-export" type="button">Export backup</button><label class="btn fileb" style="margin:0;color:var(--ink)">Import backup<input id="set-import" type="file" accept="application/json,.json"></label></div>
+<h3>Screen check</h3><div class="row"><button class="btn" id="set-ruler" type="button">Measure top blur</button></div>
 <p id="set-msg" role="status"></p><p id="set-build"></p>
 <div class="row"><button class="btn" id="set-close" type="button">Close</button></div></dialog>
 <main>

@@ -466,3 +466,17 @@ test('malformed settings in the repo are ignored',async()=>{
   assert.deepEqual(errors,[]);
   await ctx.close();
 });
+
+test('settings can show a ruler for measuring the iOS top blur',async()=>{
+  const {ctx,page,errors}=await openApp({hash:'stats'});
+  await page.click('#gear');await page.click('#set-ruler');
+  assert.equal(await page.$eval('#settings',d=>d.open),false);
+  const r=await page.$eval('#ruler',el=>({top:el.getBoundingClientRect().top,hidden:el.hidden,labels:[...el.querySelectorAll('[data-y]')].map(x=>[Number(x.dataset.y),Math.round(x.getBoundingClientRect().top)])}));
+  assert.equal(r.hidden,false);assert.equal(r.top,0);
+  assert.deepEqual(r.labels.slice(0,3),[[0,0],[4,4],[8,8]]);
+  assert.equal(r.labels[r.labels.length-1][0],120);
+  await page.click('#ruler');
+  assert.equal(await page.$eval('#ruler',el=>el.hidden),true);
+  assert.deepEqual(errors,[]);
+  await ctx.close();
+});
