@@ -1,0 +1,37 @@
+# Publishes a GitHub release for every app build that reaches main.
+# The version is the build stamp the app shows under Settings > App version (written by src/build.py into split.js).
+name: Release
+
+on:
+  push:
+    branches: [main]
+    paths: ['split.js']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Read the app version
+        id: version
+        run: echo "value=$(grep -oP "const BUILD='\K[0-9]{4}-[0-9]{2}-[0-9]{2}\.[0-9]{6}(?=')" split.js)" >> "$GITHUB_OUTPUT"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.value }}
+        run: |
+          if [ -z "$VERSION" ]; then echo "No app version found in split.js"; exit 1; fi
+          if gh release view "v$VERSION" >/dev/null 2>&1; then echo "Release v$VERSION already exists"; exit 0; fi
+          gh release create "v$VERSION" --target "$GITHUB_SHA" --title "Split $VERSION" --generate-notes

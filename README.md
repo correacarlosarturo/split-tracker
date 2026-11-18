@@ -156,7 +156,7 @@ The README images are rendered from the built app with made-up demo data, so the
 python3 src/build.py && node tools/readme-shots.js
 ```
 
-Commit and push, and GitHub Pages redeploys in a minute or two. The service worker serves the cached copy when offline and the fresh copy when online.
+Commit and push, and GitHub Pages redeploys in a minute or two. Each build that reaches `main` is published as a GitHub release named after its version, the same number the app shows under Settings → App version. The service worker serves the cached copy when offline and the fresh copy when online.
 
 Plan data (exercises, sets, rep ranges, start weights) lives in `src/data.js`, and the alternatives in `src/alts.js`.
 
