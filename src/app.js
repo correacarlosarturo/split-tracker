@@ -85,9 +85,10 @@ function refreshStatus(){
     else{t=loc+' · synced'+(syncAt?' '+hhmmOf(syncAt):'');s='synced';}
   }
   el.textContent=t;el.dataset.s=s;
+  const g=$('#gear');if(g)g.setAttribute('aria-label','Settings. '+t);
   const st=$('#set-status');if(st)st.textContent=t;
 }
-function stamp(msg){const el=$('#sync');if(el){el.textContent=msg;el.dataset.s='error';}}
+function stamp(msg){const el=$('#sync');if(el){el.textContent=msg;el.dataset.s='error';}const g=$('#gear');if(g)g.setAttribute('aria-label','Settings. '+msg);}
 function schedSync(ms){clearTimeout(syncT);if(!cfg()){syncState='off';refreshStatus();return;}if(syncState!=='syncing')syncState='pending';refreshStatus();syncT=setTimeout(runSync,ms===undefined?1500:ms);}
 const b64=s=>btoa(unescape(encodeURIComponent(s)));
 const unb64=s=>decodeURIComponent(escape(atob(s.replace(/\s/g,''))));
@@ -643,25 +644,27 @@ function keepClear(t){
 document.addEventListener('focusin',e=>{const t=e.target;if(!t.matches||!t.matches('input,textarea,select')||t.closest('dialog'))return;[60,350].forEach(ms=>setTimeout(()=>{if(document.activeElement===t)keepClear(t);},ms));});
 /* ---------- themes ---------- */
 const LS_TH='split-theme-v1';
-const themeGet=()=>Object.assign({mode:'auto',accent:'clay',contrast:'normal'},lsGet(LS_TH,{}));
+const themeGet=()=>Object.assign({mode:'auto',accent:'clay',contrast:'normal',glass:50},lsGet(LS_TH,{}));
+const glassOf=T=>{const g=Number(T.glass);return isFinite(g)?clamp(g,0,100):50;};
 function applyTheme(){
   const T=themeGet(),d=document.documentElement,mq=matchMedia('(prefers-color-scheme: dark)');
-  d.dataset.scheme=T.mode==='auto'?(mq.matches?'dark':'light'):T.mode;d.dataset.accent=T.accent;d.dataset.contrast=T.contrast;
+  d.dataset.scheme=T.mode==='auto'?(mq.matches?'dark':'light'):T.mode;d.dataset.accent=T.accent;d.dataset.contrast=T.contrast;d.style.setProperty('--tint',String(glassOf(T)/100));
   const tc=$('#tc');if(tc)tc.content=getComputedStyle(d).getPropertyValue('--bg').trim()||'#faf9f5';
   document.querySelectorAll('#th-mode button').forEach(b=>b.classList.toggle('on',b.dataset.mode===T.mode));
   document.querySelectorAll('#th-acc button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.acc===T.accent?'true':'false'));
   const hc=$('#th-hc');if(hc)hc.checked=T.contrast==='high';
+  const gl=$('#th-glass');if(gl)gl.value=String(glassOf(T));
 }
 function setTheme(p){lsSet(LS_TH,Object.assign(themeGet(),p));applyTheme();}
 $('#th-mode').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setTheme({mode:b.dataset.mode});});
 $('#th-acc').addEventListener('click',e=>{const b=e.target.closest('button');if(b)setTheme({accent:b.dataset.acc});});
 $('#th-hc').addEventListener('change',e=>setTheme({contrast:e.target.checked?'high':'normal'}));
+$('#th-glass').addEventListener('input',e=>setTheme({glass:Number(e.target.value)}));
 try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{if(themeGet().mode==='auto')applyTheme();});}catch(e){}
 applyTheme();
 /* ---------- settings sheet ---------- */
 const dlg=$('#settings');
 function openSettings(){const c=cfg();$('#set-repo').value=c?c.repo:'';$('#set-token').value='';$('#set-target').value=targetKg()||'';$('#set-token').placeholder=c?'Token saved. Leave empty to keep it':'github_pat_…';$('#set-build').textContent='App version '+BUILD;$('#set-msg').textContent='';refreshStatus();if(dlg.showModal)dlg.showModal();else dlg.setAttribute('open','');}
-$('#sync').addEventListener('click',openSettings);
 $('#gear').addEventListener('click',openSettings);
 $('#set-close').addEventListener('click',()=>dlg.close());
 $('#set-x').addEventListener('click',()=>dlg.close());
