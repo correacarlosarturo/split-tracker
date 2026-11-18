@@ -10,7 +10,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Split"><meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="theme-color" id="tc" content="#faf9f5">
-<script src="theme.js?v=2026-11-18.124001"></script>
+<script src="theme.js?v=2026-11-18.124237"></script>
 <style>
 /* Layout: one narrow column, sticky header, bottom tab bar. Palette: graphite with indigo accent; heat uses its own red-to-green scale. */
 /* Look: warm paper, clay accent, serif display + system sans, quiet hairline cards (follows the iPhone light/dark setting) */
@@ -328,15 +328,15 @@ header .in h1{flex:none;white-space:nowrap}header .in #sync{flex:1 1 auto;min-wi
 html,html[data-scheme="light"]{--disp:var(--sans);--radius-card:22px;--radius-pill:999px;
   --bg:#eceef4;--surface:#fff;--ink:#121216;--muted:#4a4a53;--line:rgba(20,20,45,.10);--inset:rgba(255,255,255,.55);
   --glass:rgba(255,255,255,.52);--glass-bar:rgba(255,255,255,.66);--glass-edge:rgba(255,255,255,.78);--glass-hi:rgba(255,255,255,.95);--glass-sel:rgba(255,255,255,.72);--glass-shade:rgba(28,30,60,.10);
-  --wash-1:color-mix(in srgb,var(--acc,#c4573a) 34%,transparent);--wash-2:rgba(96,140,255,.26);--wash-3:rgba(255,186,120,.34);
+  --wash-1:color-mix(in srgb,var(--acc,#c4573a) 40%,transparent);--wash-2:color-mix(in srgb,var(--acc-clay,#c96442) 26%,transparent);--wash-3:color-mix(in srgb,color-mix(in srgb,var(--acc,#c4573a) 55%,#fff) 45%,transparent);
   --idle:rgba(20,20,45,.07);--body:rgba(20,20,45,.10);--blur:blur(24px) saturate(180%)}
-html[data-scheme="dark"]{--bg:#101116;--surface:#1c1d24;--ink:#f3f3f6;--muted:#a6a6b0;--line:rgba(255,255,255,.10);--inset:rgba(255,255,255,.07);
+html[data-scheme="dark"]{--bg:#101116;--surface:#1c1d24;--ink:#f3f3f6;--muted:#b4b4be;--line:rgba(255,255,255,.10);--inset:rgba(255,255,255,.07);
   --glass:rgba(38,39,50,.48);--glass-bar:rgba(30,31,40,.62);--glass-edge:rgba(255,255,255,.13);--glass-hi:rgba(255,255,255,.16);--glass-sel:rgba(255,255,255,.14);--glass-shade:rgba(0,0,0,.40);
-  --wash-1:color-mix(in srgb,var(--acc,#d97757) 30%,transparent);--wash-2:rgba(70,100,220,.22);--wash-3:rgba(200,120,70,.18);
+  --wash-1:color-mix(in srgb,var(--acc,#d97757) 36%,transparent);--wash-2:color-mix(in srgb,var(--acc-clay,#d97757) 24%,transparent);--wash-3:color-mix(in srgb,var(--acc-soft,#4a362d) 70%,transparent);
   --idle:rgba(255,255,255,.08);--body:rgba(255,255,255,.10)}
 html[data-scheme="black"]{--bg:#000;--surface:#0e0e10;--ink:#f3f3f6;--muted:#a6a6b0;--line:rgba(255,255,255,.10);--inset:rgba(255,255,255,.07);
   --glass:rgba(26,26,30,.58);--glass-bar:rgba(18,18,22,.70);--glass-edge:rgba(255,255,255,.11);--glass-hi:rgba(255,255,255,.12);--glass-sel:rgba(255,255,255,.13);--glass-shade:rgba(0,0,0,.6);
-  --wash-1:color-mix(in srgb,var(--acc,#d97757) 16%,transparent);--wash-2:rgba(70,100,220,.10);--wash-3:rgba(200,120,70,.08);
+  --wash-1:color-mix(in srgb,var(--acc,#d97757) 44%,transparent);--wash-2:color-mix(in srgb,var(--acc-clay,#d97757) 32%,transparent);--wash-3:color-mix(in srgb,var(--acc-soft,#4a362d) 80%,transparent);
   --idle:rgba(255,255,255,.08);--body:rgba(255,255,255,.10)}
 body{background:var(--bg)}
 body::before{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;
@@ -426,6 +426,6 @@ html[data-contrast="high"] body::before{display:none}
 <button data-tab="coach"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 7h12M8 12h12M8 17h12M4 7h.01M4 12h.01M4 17h.01"/></svg>Coach</button>
 </div></nav>
 <div id="toast" role="status" aria-live="polite"></div>
-<script src="split.js?v=2026-11-18.124001"></script>
+<script src="split.js?v=2026-11-18.124237"></script>
 </body>
 </html>

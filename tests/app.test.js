@@ -226,27 +226,35 @@ test('glass: wash sits behind the page and bars blur, cards do not',async()=>{
   await ctx.close();
 });
 
-test('glass: text contrast holds in light, dark and black',async()=>{
-  for(const mode of ['light','dark','black']){
-    const {ctx,page}=await openApp({hash:'stats',ls:theme(mode)});
+test('glass: text contrast holds in light, dark and black',{timeout:120000},async()=>{
+  for(const mode of ['light','dark','black'])for(const accent of ['clay','ocean','forest','violet','graphite']){
+    const {ctx,page}=await openApp({hash:'stats',ls:theme(mode,{accent})});
     const c=await tokenColors(page,['--bg','--ink','--muted','--glass','--wash-1','--wash-2','--wash-3']);
     for(const k in c)assert.ok(c[k],mode+' '+k+' resolves to a colour');
     for(const w of [null,c['--wash-1'],c['--wash-2'],c['--wash-3']]){
       const ground=w?over(w,c['--bg']):c['--bg'],surf=over(c['--glass'],ground);
       for(const ink of ['--ink','--muted']){
         const r=contrast(c[ink],surf);
-        assert.ok(r>=4.5,`${mode}: ${ink} on glass over ${w?'wash':'bg'} is ${r.toFixed(2)}:1`);
+        assert.ok(r>=4.5,`${mode}/${accent}: ${ink} on glass over ${w?'wash':'bg'} is ${r.toFixed(2)}:1`);
       }
     }
     await ctx.close();
   }
 });
 
-test('glass: black mode keeps a black background',async()=>{
-  const {ctx,page}=await openApp({hash:'stats',ls:theme('black')});
-  const c=await tokenColors(page,['--bg']);
-  assert.deepEqual(c['--bg'].slice(0,3).map(v=>Math.round(v*255)),[0,0,0]);
-  await ctx.close();
+test('glass: the background gradient follows the accent in every mode',async()=>{
+  for(const mode of ['light','dark','black']){
+    const got={};
+    for(const accent of ['clay','ocean']){
+      const {ctx,page}=await openApp({hash:'stats',ls:theme(mode,{accent})});
+      got[accent]=await tokenColors(page,['--wash-1','--wash-2','--wash-3']);
+      await ctx.close();
+    }
+    for(const w of ['--wash-1','--wash-2','--wash-3']){
+      assert.notDeepEqual(got.clay[w].slice(0,3).map(v=>v.toFixed(2)),got.ocean[w].slice(0,3).map(v=>v.toFixed(2)),mode+' '+w+' changes with the accent');
+      assert.ok(got.clay[w][3]>=(mode==='black'?.3:.2),mode+' '+w+' is visible (alpha '+got.clay[w][3]+')');
+    }
+  }
 });
 
 test('glass: high contrast is solid',async()=>{

@@ -67,7 +67,7 @@ If your data repo has `coach/YYYY-MM-DD.json`, the Log tab shows its note for th
 
 ### Looks right in the gym
 
-Liquid Glass styling in Auto, Light, Dark or true-black mode, with five accent colours. High contrast turns the glass solid for bright gyms.
+Liquid Glass styling in Auto, Light, Dark or Black mode, with five accent colours. The background is a soft gradient in whichever accent you pick. High contrast turns the glass solid for bright gyms.
 
 </td>
 <td width="44%"><img src="docs/screenshots/dark.png" alt="The Stats tab in dark mode with the Ocean accent"></td>
