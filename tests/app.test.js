@@ -276,36 +276,6 @@ test('glass: falls back when backdrop-filter is unsupported',async()=>{
   assert.ok(a&&Number(a[1])>=.92,'--glass-bar alpha >= .92');
 });
 
-test('stats shows an animated preview of the next lift',async()=>{
-  const {ctx,page,errors}=await openApp({hash:'stats'});
-  assert.equal(await page.$$eval('.nextlift .fx img',n=>n.length),2);
-  assert.match(await page.textContent('.nextlift'),/Lat pulldown/);
-  assert.match(await page.textContent('.nextlift'),/Next: 55 kg/);
-  assert.equal(await page.$eval('.nextlift .fx img+img',i=>getComputedStyle(i).animationName),'fx');
-  assert.deepEqual(errors,[]);
-  await ctx.close();
-});
-
-test('the preview obeys reduced motion and tap',async()=>{
-  const {ctx,page}=await openApp({hash:'stats',ctxOpts:{reducedMotion:'reduce'}});
-  assert.equal(await page.$eval('.nextlift .fx img+img',i=>getComputedStyle(i).animationName),'none');
-  await page.click('.nextlift .fx');
-  assert.ok(await page.$eval('.nextlift .fx',f=>f.classList.contains('end')));
-  await ctx.close();
-});
-
-test('the preview survives a lift without images',async()=>{
-  const before=ctx=>ctx.route('**/split.js*',async route=>{
-    const r=await route.fetch();const body=(await r.text()).replace('"d1-lat":"lat-pulldown",','');
-    await route.fulfill({response:r,body});
-  });
-  const {ctx,page,errors}=await openApp({hash:'stats',before});
-  assert.match(await page.textContent('.nextlift'),/Lat pulldown/);
-  assert.equal(await page.$$eval('.nextlift img',n=>n.length),0);
-  assert.deepEqual(errors,[]);
-  await ctx.close();
-});
-
 test('readme renders exist and are framed phones',{timeout:180000},async()=>{
   const {spawnSync}=require('node:child_process'),os=require('node:os');
   const out=fs.mkdtempSync(path.join(os.tmpdir(),'shots-'));
@@ -331,12 +301,44 @@ test('glass: the no-blur fallback makes bars near-opaque in every mode',async()=
   }
 });
 
-test('the preview keeps full width when the lift has no image',async()=>{
-  const before=ctx=>ctx.route('**/split.js*',async route=>{
-    const r=await route.fetch();await route.fulfill({response:r,body:(await r.text()).replace('"d1-lat":"lat-pulldown",','')});
-  });
-  const {ctx,page}=await openApp({hash:'stats',before});
-  const w=await page.$eval('.nextlift',c=>({card:c.getBoundingClientRect().width,info:c.querySelector('.nli').getBoundingClientRect().width}));
-  assert.ok(w.info>w.card*.8,`info column ${w.info}px of ${w.card}px card`);
+test('stats no longer shows a first-lift card',async()=>{
+  const {ctx,page}=await openApp({hash:'stats'});
+  assert.equal(await page.$$eval('.nextlift',n=>n.length),0);
+  assert.doesNotMatch(await page.textContent('#tab-stats'),/First lift/i);
+  await ctx.close();
+});
+
+test('settings has a close button in the top right corner',async()=>{
+  const {ctx,page}=await openApp({hash:'stats'});
+  await page.click('#gear');
+  const r=await page.evaluate(()=>{const d=document.querySelector('#settings').getBoundingClientRect(),x=document.querySelector('#set-x');const b=x.getBoundingClientRect();return {label:x.getAttribute('aria-label'),right:d.right-b.right,top:b.top-d.top,w:b.width,h:b.height};});
+  assert.equal(r.label,'Close settings');
+  assert.ok(r.right<40&&r.top<40,'top right: '+JSON.stringify(r));
+  assert.ok(r.w>=44&&r.h>=44,'44px touch target');
+  await page.click('#set-x');
+  assert.equal(await page.$eval('#settings',d=>d.open),false);
+  await ctx.close();
+});
+
+test('a focused input is never left under the pinned header',async()=>{
+  const {ctx,page}=await openApp({hash:'log',ctxOpts:{viewport:{width:390,height:700}}});
+  const sel='input[data-ex][data-i="0"][data-f="reps"]';
+  // put the input partly underneath the header, as when the page has scrolled
+  await page.evaluate(sel=>{const h=document.querySelector('header').getBoundingClientRect().bottom,i=document.querySelector(sel).getBoundingClientRect().top;window.scrollBy(0,i-h+20);},sel);
+  await page.focus(sel);await page.waitForTimeout(400);
+  const r=await page.evaluate(sel=>({header:document.querySelector('header').getBoundingClientRect().bottom,input:document.querySelector(sel).getBoundingClientRect().top}),sel);
+  assert.ok(r.input>=r.header,`input top ${r.input} vs header bottom ${r.header}`);
+  await ctx.close();
+});
+
+test('date and body weight fields never overlap on a narrow phone',async()=>{
+  const {ctx,page}=await openApp({hash:'log',ctxOpts:{viewport:{width:320,height:640}}});
+  const r=await page.evaluate(()=>{const d=document.querySelector('#f-date'),b=document.querySelector('#f-bw'),cs=getComputedStyle(d);
+    const R=e=>e.getBoundingClientRect(),dr=R(d),br=R(b),dl=R(d.closest('.fld')),bl=R(b.closest('.fld'));
+    const overlap=!(dr.right<=br.left||br.right<=dr.left||dr.bottom<=br.top||br.bottom<=dr.top);
+    return {overlap,dateInside:dr.right<=dl.right+0.5,bwInside:br.right<=bl.right+0.5,appearance:cs.appearance||cs.webkitAppearance,minW:cs.minWidth,fldMinW:getComputedStyle(d.closest('.fld')).minWidth};});
+  assert.equal(r.overlap,false);assert.ok(r.dateInside&&r.bwInside,JSON.stringify(r));
+  // guards for iOS Safari, whose native date control will not shrink to its column otherwise
+  assert.equal(r.appearance,'none');assert.equal(r.minW,'0px');assert.equal(r.fldMinW,'0px');
   await ctx.close();
 });
