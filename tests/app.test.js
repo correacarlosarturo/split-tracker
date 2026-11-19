@@ -477,3 +477,115 @@ test('the settings sheet opens below the band iOS blurs, and the ruler is gone',
   assert.equal(await page.$('#set-ruler'),null);assert.equal(await page.$('#ruler'),null);
   await ctx.close();
 });
+
+/* ---------- skipping a lift for one day ---------- */
+const lat3=(date,kg=60)=>({date,day:'D1',savedAt:new Date().toISOString(),entries:{'d1-lat':{sets:[{kg,reps:11},{kg,reps:11},{kg,reps:11}]}}});
+const savedSessions=page=>page.evaluate(()=>JSON.parse(localStorage.getItem('split-sessions-v2')||'{}'));
+
+test('every lift on the Log tab has a Skip today button',async()=>{
+  const {ctx,page}=await openApp({hash:'log'});
+  const r=await page.evaluate(()=>({cards:document.querySelectorAll('.card.ex').length,skips:[...document.querySelectorAll('.card.ex [data-skip]')].map(b=>[b.textContent.trim(),b.getAttribute('aria-label')])}));
+  assert.ok(r.cards>=5);assert.equal(r.skips.length,r.cards);
+  for(const [t,a] of r.skips){assert.equal(t,'Skip today');assert.match(a,/^Skip .+ today$/);}
+  await ctx.close();
+});
+
+test('skipping collapses the lift, saves it as skipped, and Undo brings it back',async()=>{
+  const d=today();
+  const {ctx,page,errors}=await openApp({hash:'log',ls:{'split-sessions-v2':{[daysAgo(2)]:lat3(daysAgo(2))}}});
+  await page.click('.daybtn[data-day="D1"]');
+  await page.click('[data-skip="d1-lat"]');
+  assert.ok(await page.$('#x-d1-lat.skipped'));
+  assert.match(await page.textContent('#x-d1-lat'),/Skipped today/);
+  assert.equal(await page.$$eval('#x-d1-lat input',n=>n.length),0,'no inputs on a skipped lift');
+  assert.ok(await page.$$eval('#x-d1-row input',n=>n.length)>0,'other lifts are untouched');
+  await page.waitForFunction(k=>{const s=JSON.parse(localStorage.getItem('split-sessions-v2')||'{}')[k];return !!(s&&s.entries['d1-lat']&&s.entries['d1-lat'].skipped===true);},d,{timeout:8000});
+  const e=(await savedSessions(page))[d].entries['d1-lat'];
+  assert.deepEqual(e,{sets:[],skipped:true});
+  await page.click('[data-unskip="d1-lat"]');
+  assert.equal(await page.$('#x-d1-lat.skipped'),null);
+  assert.ok(await page.$$eval('#x-d1-lat input',n=>n.length)>0,'inputs are back');
+  assert.match(await page.textContent('#x-d1-lat'),/Next: 60 kg/);
+  assert.deepEqual(errors,[]);
+  await ctx.close();
+});
+
+test('a skip is for that day only: the plan, other days and weight suggestions are unchanged',async()=>{
+  const d=today(),tomorrow=daysAgo(-1);
+  const {ctx,page}=await openApp({hash:'log',ls:{'split-sessions-v2':{[daysAgo(2)]:lat3(daysAgo(2))}}});
+  await page.click('.daybtn[data-day="D1"]');
+  await page.click('[data-skip="d1-lat"]');
+  await page.waitForFunction(k=>{const s=JSON.parse(localStorage.getItem('split-sessions-v2')||'{}')[k];return !!(s&&s.entries['d1-lat']);},d,{timeout:8000});
+  // another date: the lift is back, and its history and suggestion skip over the skipped day
+  await page.$eval('#f-date',(el,v)=>{el.value=v;el.dispatchEvent(new Event('change',{bubbles:true}));},tomorrow);
+  await page.click('.daybtn[data-day="D1"]');
+  assert.equal(await page.$('#x-d1-lat.skipped'),null);
+  const t=await page.textContent('#x-d1-lat');
+  assert.match(t,new RegExp('Last time \\('+fmtDateRe(daysAgo(2))+'\\)'));assert.match(t,/Next: 60 kg/);
+  // the plan still lists it
+  await page.click('nav button[data-tab="plan"]');
+  assert.match(await page.textContent('#tab-plan'),/Lat pulldown/);
+  await ctx.close();
+});
+const fmtDateRe=s=>{const a=s.split('-').map(Number),W=['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];return W[new Date(a[0],a[1]-1,a[2]).getDay()]+' '+s.slice(8)+'/'+s.slice(5,7);};
+
+test('a skipped lift stays skipped after a reload',async()=>{
+  const d=today();
+  const {ctx,page}=await openApp({hash:'log'});
+  await page.click('.daybtn[data-day="D1"]');
+  await page.click('[data-skip="d1-row"]');
+  await page.waitForFunction(k=>{const s=JSON.parse(localStorage.getItem('split-sessions-v2')||'{}')[k];return !!(s&&s.entries['d1-row']);},d,{timeout:8000});
+  await page.reload();await page.waitForSelector('#tab-log section');
+  assert.ok(await page.$('#x-d1-row.skipped'));
+  await ctx.close();
+});
+
+test('skipped lifts count as no sets and no lifts, and the summary says skipped',async()=>{
+  const d=today();
+  const s={date:d,day:'D1',savedAt:new Date().toISOString(),entries:{'d1-lat':{sets:[{kg:50,reps:10}]},'d1-row':{sets:[],skipped:true}}};
+  const {ctx,page,errors}=await openApp({hash:'log',ls:{'split-sessions-v2':{[d]:s}}});
+  assert.match(await page.textContent('.recent .rbtn'),/1 lifts?/);
+  await page.click('nav button[data-tab="coach"]');await page.click('#b-copy');
+  const box=await page.$eval('#copybox',t=>t.value);
+  assert.match(box,/Seated cable row: skipped/);assert.match(box,/Lat pulldown: 50x10/);
+  await page.click('nav button[data-tab="stats"]');
+  assert.match(await page.textContent('#tab-stats .rbtn[data-open]'),/1 sets/);
+  assert.deepEqual(errors,[]);
+  await ctx.close();
+});
+
+test('skipped lifts sync and import, and a malformed skip flag is ignored',async()=>{
+  const d=daysAgo(1);
+  const doc={date:d,day:'D1',savedAt:new Date().toISOString(),entries:{'d1-lat':{sets:[{kg:50,reps:10}]},'d1-row':{sets:[],skipped:true},'d1-bbrow':{sets:[],skipped:'yes'}}};
+  // sync: pushed to the repo with the flag, and pulled back cleaned
+  const gh=fakeGitHub({});
+  const a=await openApp({gh,hash:'log',ls:{'split-sync-cfg-v1':CFG,'split-sessions-v2':{[d]:doc},'split-queue-v1':{[d]:'put'}}});
+  await waitSync(a.page);
+  const up=JSON.parse(gh.files['sessions/'+d+'.json']);
+  assert.deepEqual(up.entries['d1-row'],{sets:[],skipped:true});
+  assert.equal(up.entries['d1-bbrow'],undefined,'skipped:"yes" is not a skip');
+  await a.ctx.close();
+  // backup import
+  const b=await openApp({hash:'log'});
+  await b.page.click('#gear');
+  await b.page.setInputFiles('#set-import',{name:'b.json',mimeType:'application/json',buffer:Buffer.from(JSON.stringify({sessions:{[d]:doc}}))});
+  await b.page.waitForFunction(()=>/Imported 1/.test(document.querySelector('#set-msg').textContent));
+  const got=(await savedSessions(b.page))[d].entries;
+  assert.deepEqual(got['d1-row'],{sets:[],skipped:true});assert.equal(got['d1-bbrow'],undefined);
+  await b.ctx.close();
+});
+
+test('a day with only skips is not a workout, and undoing the only skip leaves no empty session',async()=>{
+  const d=today();
+  const only={date:d,day:'D1',savedAt:new Date().toISOString(),entries:{'d1-lat':{sets:[],skipped:true}}};
+  const {ctx,page,errors}=await openApp({hash:'stats',ls:{'split-sessions-v2':{[d]:only}}});
+  assert.match(await page.textContent('.tiles .tile'),/Workouts\s*0/);
+  assert.match(await page.textContent('.next'),/D1/,'Next up has not moved on from D1');
+  // undo the only skip: the saved session disappears
+  await page.click('nav button[data-tab="log"]');
+  await page.click('[data-load="'+d+'"]');
+  await page.click('[data-unskip="d1-lat"]');
+  await page.waitForFunction(k=>!JSON.parse(localStorage.getItem('split-sessions-v2')||'{}')[k],d,{timeout:8000});
+  assert.deepEqual(errors,[]);
+  await ctx.close();
+});
