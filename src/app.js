@@ -36,7 +36,7 @@ function cleanSession(date,v){
   for(const id of Object.keys(src)){
     const ex=exById(id),en=src[id];if(!ex||ex.d!==v.day||!en||typeof en!=='object')continue;
     const sets=(Array.isArray(en.sets)?en.sets:[]).map(s=>s&&typeof s==='object'?{kg:num(s.kg),reps:num(s.reps)}:null).filter(s=>s&&s.kg!==null&&s.kg>=0&&s.reps!==null&&s.reps>0);
-    if(!sets.length)continue;
+    if(!sets.length){if(en.skipped===true)out.entries[id]={sets:[],skipped:true};continue;}
     const e={sets};
     if(typeof en.alt==='string'&&(ALT[ex.k]||[]).some(a=>a.id===en.alt))e.alt=en.alt;
     const r=num(en.rpe);if(r!==null&&r>0)e.rpe=r;
@@ -57,6 +57,7 @@ function cleanBackup(b){
     entries[id]={sets:Array.isArray(en.sets)?en.sets.map(s=>s&&typeof s==='object'?{kg:str(s.kg),reps:str(s.reps)}:null):[]};
     if(typeof en.alt==='string')entries[id].alt=en.alt;
     if(en.rpe!=null)entries[id].rpe=String(en.rpe);
+    if(en.skipped===true)entries[id].skipped=true;
   }
   return{date:b.date,day:b.day,bw:str(b.bw)||'',notes:typeof b.notes==='string'?b.notes:'',entries};
 }
@@ -247,7 +248,9 @@ async function initDb(){
   try{if(navigator.storage&&navigator.storage.persist)navigator.storage.persist();}catch(e){}
   refreshStatus();schedSync(800);
 }
-function realList(){return Object.keys(state.sessions).sort().map(k=>state.sessions[k]);}
+/* a day where every lift was skipped, with no weight or note, is saved so the skips stick but is not a workout */
+const skipOnly=s=>!s.bw&&!s.notes&&Object.values(s.entries||{}).length>0&&Object.values(s.entries).every(e=>e.skipped===true);
+function realList(){return Object.keys(state.sessions).sort().map(k=>state.sessions[k]).filter(s=>!skipOnly(s));}
 
 /* ---------- sample week so the page is complete at rest ---------- */
 function sampleSessions(){
@@ -331,6 +334,7 @@ function cleanDraft(){
   const bw=num(d.bw);if(bw)out.bw=bw;if(d.notes&&d.notes.trim())out.notes=d.notes.trim();
   for(const id in d.entries){
     const ex=exById(id);if(!ex||ex.d!==d.day)continue;
+    if(d.entries[id].skipped===true){out.entries[id]={sets:[],skipped:true};continue;}/* skipped for this day only: typed sets stay in the draft so Undo can bring them back */
     const sets=(d.entries[id].sets||[]).map(s=>s?{kg:num(s.kg),reps:num(s.reps)}:null).filter(s=>s&&s.reps>0&&s.kg!==null&&s.kg>=0);
     if(sets.length){out.entries[id]={sets};const al=d.entries[id].alt;if(al&&(ALT[ex.k]||[]).some(x=>x.id===al))out.entries[id].alt=al;const r=num(d.entries[id].rpe);if(r)out.entries[id].rpe=r;}
   }
@@ -347,7 +351,11 @@ function scheduleAuto(){backupDraft();clearTimeout(autoT);refreshStatus();autoT=
 async function autoSave(){
   clearTimeout(autoT);if(!state.dirty||saving)return;
   const d=cleanDraft();
-  if(!Object.keys(d.entries).length&&!d.bw&&!d.notes){return;}
+  if(!Object.keys(d.entries).length&&!d.bw&&!d.notes){
+    const old=state.sessions[d.date];
+    if(old&&skipOnly(old)){saving=true;try{await db.doc('sessions/'+d.date).delete();state.dirty=false;clearBackup();state.lastLocal=hhmm();refreshStatus();try{renderStats();}catch(e){}}catch(e){}saving=false;}
+    return;
+  }
   saving=true;
   try{
     await db.doc('sessions/'+d.date).set(d);
@@ -410,6 +418,7 @@ function renderLog(){
   <div class="ready"><span class="lbl">Muscles for this day if you train now</span>${ready}</div></section>`;
   {const co=state.coach&&state.coach[d.date];if(co&&co.summary)h+=`<section class="card coachnote"><h3 class="sec">Coach · for today</h3><p>${esc(co.summary)}</p></section>`;}
   h+=exs.map(ex=>{
+    if((d.entries[ex.id]||{}).skipped===true)return`<section class="card ex skipped" id="x-${ex.id}"><div class="exhead"><div><h3>${ex.n}</h3><div class="meta"><span class="tag">Skipped today</span></div></div><button class="btn mini" type="button" data-unskip="${ex.id}" aria-label="Undo skipping ${ex.n}">Undo skip</button></div></section>`;
     const en0=d.entries[ex.id]||{},alt=altOf(ex,en0),sg=suggest(ex,d.date,alt),le=lastEntry(alt?ex.k+'~'+alt.id:ex.k,d.date),en=en0.sets||[];
     const last=le?'Last time ('+fmtDate(le.date)+'): '+le.sets.map(s=>fmtKg(s.kg)+'×'+s.reps).join(', '):'No history yet.';
     let rows='';
@@ -419,12 +428,12 @@ function renderLog(){
     }
     return`<section class="card ex" id="x-${ex.id}"><div class="exhead"><div><h3>${alt?alt.n:ex.n}</h3><div class="meta"><span class="big">${ex.s} × ${ex.r[0]}–${ex.r[1]}</span> ${alt?`<span class="tag swap">instead of ${ex.n}</span>`:srcTag(ex)}</div></div></div>
     <div class="exbody">${alt?`<div class="fx static"><img src="${ALTIMG[alt.rid]}" alt=""></div>`:figHtml(ex)}<div class="info"><p class="cue">${alt?alt.cue:ex.cue}</p><p class="tgt"><b>Next: ${fmtKg(sg.kg)} kg</b> <span>${alt?alt.u:ex.u}</span><br>${sg.text}</p><p class="hist">${last}</p>${!alt&&ex.note?`<p class="note">${ex.note}</p>`:''}${!alt&&ex.tw?`<p class="note">Sets changed from ${ex.rs} to ${ex.s}. ${ex.tw}</p>`:''}</div></div>${altsHtml(ex,alt)}
-    <div class="sets">${rows}</div><label class="rpe">Effort (RPE 6–10) <input type="text" inputmode="decimal" data-ex="${ex.id}" data-f="rpe" value="${esc((d.entries[ex.id]||{}).rpe||'')}" placeholder="optional" aria-label="${ex.n} effort"></label></section>`;
+    <div class="sets">${rows}</div><label class="rpe">Effort (RPE 6–10) <input type="text" inputmode="decimal" data-ex="${ex.id}" data-f="rpe" value="${esc((d.entries[ex.id]||{}).rpe||'')}" placeholder="optional" aria-label="${ex.n} effort"></label><button class="btn skipbtn" type="button" data-skip="${ex.id}" aria-label="Skip ${ex.n} today">Skip today</button></section>`;
   }).join('');
   h+=`<section class="card"><label class="fld"><span>Session notes</span><textarea id="f-notes" rows="2" placeholder="Sleep, how it felt, anything Claude should know">${esc(d.notes||'')}</textarea></label>
   <div class="actions"><button class="btn primary" id="b-save">${exists?'Update session':'Save session'}</button>${exists?`<button class="btn ghost danger" id="b-del">${state.confirmDel?'Tap again to delete':'Delete session'}</button>`:''}</div></section>`;
   const recent=Object.keys(state.sessions).sort().reverse().slice(0,6);
-  h+=`<section class="card"><h3 class="sec">Recent sessions</h3>${recent.length?`<div class="recent">${recent.map(k=>`<button class="rbtn" data-load="${k}"><b>${fmtDate(k)}</b><span>${esc(state.sessions[k].day)} ${esc((dayOf(state.sessions[k].day)||{}).name)}</span><em>${Object.keys(state.sessions[k].entries||{}).length} lifts</em></button>`).join('')}</div>`:'<p class="sub">No sessions saved yet. Your first save appears here and feeds the heat map and the coach tab.</p>'}</section>`;
+  h+=`<section class="card"><h3 class="sec">Recent sessions</h3>${recent.length?`<div class="recent">${recent.map(k=>`<button class="rbtn" data-load="${k}"><b>${fmtDate(k)}</b><span>${esc(state.sessions[k].day)} ${esc((dayOf(state.sessions[k].day)||{}).name)}</span><em>${Object.values(state.sessions[k].entries||{}).filter(e=>!e.skipped).length} lifts${Object.values(state.sessions[k].entries||{}).some(e=>e.skipped)?' · '+Object.values(state.sessions[k].entries).filter(e=>e.skipped).length+' skipped':''}</em></button>`).join('')}</div>`:'<p class="sub">No sessions saved yet. Your first save appears here and feeds the heat map and the coach tab.</p>'}</section>`;
   root.innerHTML=h;
 }
 
@@ -590,7 +599,7 @@ function summaryText(){
   const since=addDays(todayStr(),-13),out=[];
   realList().filter(s=>s.date>=since).forEach(s=>{
     out.push(s.date+' '+s.day+(s.bw?' bw '+s.bw+'kg':'')+(s.notes?' | '+s.notes:''));
-    for(const id in s.entries){const ex=exById(id);if(ex){const al=altOf(ex,s.entries[id]);out.push('  '+(al?al.n+' (alternative to '+ex.n+')':ex.n)+': '+s.entries[id].sets.map(x=>x.kg+'x'+x.reps).join(', ')+(s.entries[id].rpe?' RPE '+s.entries[id].rpe:''));}}
+    for(const id in s.entries){const ex=exById(id);if(ex){const al=altOf(ex,s.entries[id]);out.push(s.entries[id].skipped?'  '+ex.n+': skipped':'  '+(al?al.n+' (alternative to '+ex.n+')':ex.n)+': '+s.entries[id].sets.map(x=>x.kg+'x'+x.reps).join(', ')+(s.entries[id].rpe?' RPE '+s.entries[id].rpe:''));}}
   });
   return out.join('\n')||'No sessions saved in the last 14 days.';
 }
@@ -611,6 +620,15 @@ document.addEventListener('click',e=>{
   if(t.id==='b-save')return saveDraft();
   if(t.id==='b-del')return deleteSession();
   if(t.id==='b-copy'){const txt=summaryText(),box=$('#copybox');box.value=txt;box.hidden=false;try{navigator.clipboard.writeText(txt).then(()=>toast('Copied'),()=>{box.select();toast('Select and copy the text below');});}catch(x){box.select();}return;}
+  if(t.dataset.skip!==undefined||t.dataset.unskip!==undefined){
+    const id=t.dataset.skip!==undefined?t.dataset.skip:t.dataset.unskip,ex=exById(id);
+    if(!ex||ex.d!==state.draft.day)return;
+    const en=state.draft.entries[id]||(state.draft.entries[id]={sets:[]});
+    if(t.dataset.skip!==undefined)en.skipped=true;else delete en.skipped;
+    state.dirty=true;scheduleAuto();const y=window.scrollY;renderLog();window.scrollTo(0,y);
+    const nb=$(t.dataset.skip!==undefined?'[data-unskip="'+id+'"]':'[data-skip="'+id+'"]');if(nb)nb.focus({preventScroll:true});
+    return;
+  }
   if(t.dataset.alt!==undefined){const p=t.dataset.alt.split('|'),en=state.draft.entries[p[0]]||(state.draft.entries[p[0]]={});if(p[1])en.alt=p[1];else delete en.alt;en.sets=[];delete en.rpe;state.dirty=true;scheduleAuto();const y=window.scrollY;renderLog();window.scrollTo(0,y);return;}
   if(t.dataset.day){const ex=state.sessions[state.date];if(ex&&ex.day===t.dataset.day){initDraft(state.date);}else{const bw=state.draft.bw;state.draft=blankDraft(state.date,t.dataset.day);state.draft.bw=bw;state.dirty=false;}renderLog();return;}
   if(t.dataset.load){initDraft(t.dataset.load);renderLog();return window.scrollTo(0,0);}

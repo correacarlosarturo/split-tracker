@@ -31,6 +31,8 @@ Each exercise shows a short animation of its start and end position, the form cu
 
 **Gym busy?** Every lift lists alternatives (cable, machine, dumbbell, band). Logging one keeps its history separate from the original.
 
+**Skipping a lift?** Tap **Skip today** under it. The lift is skipped for that day only: the plan and the other days stay as they are, and its next weight still follows your last real session. Tap **Undo skip** to bring it back.
+
 </td>
 </tr>
 <tr>
@@ -114,12 +116,13 @@ A session looks like this:
   "savedAt": "2026-11-18T18:30:00.000Z",
   "entries": {
     "d3-lp": { "sets": [{ "kg": 80, "reps": 12 }] },
-    "d3-le": { "alt": "sle", "sets": [{ "kg": 20, "reps": 12 }] }
+    "d3-le": { "alt": "sle", "sets": [{ "kg": 20, "reps": 12 }] },
+    "d3-ht": { "skipped": true, "sets": [] }
   }
 }
 ```
 
-`alt` means an alternative exercise was used instead of the planned one.
+`alt` means an alternative exercise was used instead of the planned one. `skipped` means the lift was skipped on that day only. A day where every lift was skipped, with no body weight or note, is not counted as a workout.
 
 A coach file looks like this:
 

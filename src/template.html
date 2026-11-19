@@ -406,6 +406,13 @@ header .brand h1{font:700 21px var(--sans);letter-spacing:-.02em;color:var(--ink
 /* iOS 26 blurs a band at the top of Home Screen web apps, measured on an iPhone 15 Pro Max as ending about 21px
    below the status bar (80px from the top, inset 59px). The header and the settings sheet start below it. */
 dialog#settings{margin:calc(env(safe-area-inset-top,0px) + 32px) auto auto;max-height:calc(100dvh - env(safe-area-inset-top,0px) - 32px - 24px - env(safe-area-inset-bottom,0px))}
+/* skip a lift for one day */
+.btn.skipbtn{margin-top:10px;min-height:40px;padding:8px 16px;font-size:14px;font-weight:500;color:var(--muted);background:transparent}
+.ex.skipped{padding:12px 14px}
+.ex.skipped .exhead{align-items:center}
+.ex.skipped h3{font-size:17px;color:var(--muted)}
+.ex.skipped .meta{margin-top:4px}
+.ex.skipped .btn.mini{flex:none;min-height:40px;padding:8px 16px;font-size:14px}
 /* no backdrop-filter support: bars go near-opaque so text under them stays readable */
 @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
   html,html[data-scheme="light"]{--glass-bar:rgba(246,247,250,.96);--glass-sheet:rgba(246,247,250,.97)}
