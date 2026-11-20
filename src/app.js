@@ -251,7 +251,10 @@ async function initDb(){
 }
 /* a day where every lift was skipped, with no weight or note, is saved so the skips stick but is not a workout */
 const skipOnly=s=>!s.bw&&!s.notes&&(Object.values(s.entries||{}).length>0||s.home===true)&&Object.values(s.entries||{}).every(e=>e.skipped===true);
-function realList(){return Object.keys(state.sessions).sort().map(k=>state.sessions[k]).filter(s=>!skipOnly(s));}
+/* a workout is a day with at least one logged set. A day holding only body weight, notes, skips or the home switch is not one:
+   it does not count in Stats, does not move the plan along and does not mark its day as done. */
+const hasLogged=s=>Object.values((s&&s.entries)||{}).some(e=>e&&e.skipped!==true&&(e.sets||[]).some(x=>x&&x.reps>0));
+function realList(){return Object.keys(state.sessions).sort().map(k=>state.sessions[k]).filter(hasLogged);}
 
 /* ---------- sample week so the page is complete at rest ---------- */
 function sampleSessions(){
@@ -353,6 +356,8 @@ function cleanDraft(){
   }
   return out;
 }
+/* one workout is stored per date: a draft for another day must never replace a day that already has logged sets */
+const clashes=d=>{const o=state.sessions[d.date];return !!(o&&o.day!==d.day&&hasLogged(o));};
 let toastT=null;
 function toast(msg){const t=$('#toast');t.textContent=msg;t.classList.add('on');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('on'),2600);}
 const BK='split-draft-v1';
@@ -369,6 +374,7 @@ async function autoSave(){
     if(old&&skipOnly(old)){saving=true;try{await db.doc('sessions/'+d.date).delete();state.dirty=false;clearBackup();state.lastLocal=hhmm();refreshStatus();try{renderStats();}catch(e){}}catch(e){}saving=false;}
     return;
   }
+  if(clashes(d)){stamp('Not saved: '+fmtDate(d.date)+' already has a '+state.sessions[d.date].day+' workout. Change the date to log '+d.day+'.');return;}
   saving=true;
   try{
     await db.doc('sessions/'+d.date).set(d);
@@ -378,6 +384,7 @@ async function autoSave(){
 }
 async function saveDraft(){
   const d=cleanDraft();
+  if(clashes(d)){toast('Not saved: '+fmtDate(d.date)+' already has a '+state.sessions[d.date].day+' workout. Change the date to log '+d.day+'.');return;}
   if(!Object.keys(d.entries).length&&!d.bw){toast('Enter reps for at least one set first.');return;}
   try{
     await db.doc('sessions/'+d.date).set(d);
@@ -472,7 +479,7 @@ const IC={dumb:'<path d="M3 9v6M6 7v10M18 7v10M21 9v6M6 12h12"/>',cal:'<rect x="
 const icon=n=>`<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${IC[n]}</svg>`;
 const mondayOf=d=>{const t=new Date(d+'T12:00:00'),w=(t.getDay()+6)%7;return addDays(d,-w);};
 function sessStats(s){let sets=0,vol=0;for(const id in(s.entries||{})){for(const x of(s.entries[id].sets||[])){if(x&&x.reps>0){sets++;vol+=(Number(x.kg)||0)*Number(x.reps);}}}return{sets,vol};}
-function weightPts(){return realList().filter(s=>s.bw!==''&&s.bw!=null&&Number(s.bw)>0).map(s=>({d:s.date,w:Number(s.bw)}));}
+function weightPts(){return Object.keys(state.sessions).sort().map(k=>state.sessions[k]).filter(s=>s.bw!==''&&s.bw!=null&&Number(s.bw)>0).map(s=>({d:s.date,w:Number(s.bw)}));}
 function weekStreak(){
   const wk=new Set(realList().map(s=>mondayOf(s.date)));if(!wk.size)return 0;
   let c=mondayOf(todayStr());if(!wk.has(c))c=addDays(c,-7);
@@ -647,7 +654,7 @@ document.addEventListener('click',e=>{
   }
   if(t.id==='b-home'){const on=!state.draft.home;setHome(state.draft,on);state.dirty=true;scheduleAuto();const y=window.scrollY;renderLog();window.scrollTo(0,y);const b=$('#b-home');if(b)b.focus({preventScroll:true});toast(on?'Home versions for today':'Back to the gym lifts');return;}
   if(t.dataset.alt!==undefined){const p=t.dataset.alt.split('|'),en=state.draft.entries[p[0]]||(state.draft.entries[p[0]]={});if(p[1])en.alt=p[1];else delete en.alt;en.sets=[];delete en.rpe;state.dirty=true;scheduleAuto();const y=window.scrollY;renderLog();window.scrollTo(0,y);return;}
-  if(t.dataset.day){const ex=state.sessions[state.date];if(ex&&ex.day===t.dataset.day){initDraft(state.date);}else{const bw=state.draft.bw,hm=state.draft.home;state.draft=blankDraft(state.date,t.dataset.day);state.draft.bw=bw;if(hm)setHome(state.draft,true);state.dirty=false;}renderLog();return;}
+  if(t.dataset.day){const ex=state.sessions[state.date];if(ex&&ex.day===t.dataset.day){initDraft(state.date);}else{const bw=state.draft.bw;state.draft=blankDraft(state.date,t.dataset.day);state.draft.bw=bw;state.dirty=false;}renderLog();return;}
   if(t.dataset.load){initDraft(t.dataset.load);renderLog();return window.scrollTo(0,0);}
   if(t.dataset.ar){state.ar=t.dataset.ar;return renderStats();}
   if(t.dataset.wr){state.wr=t.dataset.wr;return renderStats();}
