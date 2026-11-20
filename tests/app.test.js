@@ -718,3 +718,100 @@ test('home lifts animate whenever a matching animation exists, and use a still o
   assert.deepEqual(errors,[]);
   await ctx.close();
 });
+
+/* ---------- a logged workout is never lost, and home is for one day ---------- */
+const nextDay=page=>page.$eval('.daybtn em',e=>e.parentElement.dataset.day);
+const sessionOf=(date,day,entries,extra={})=>Object.assign({date,day,savedAt:new Date().toISOString(),entries},extra);
+const setsOf=(kg,reps,n=2)=>Array.from({length:n},()=>({kg,reps}));
+
+test("Charlie's steps: log a home workout with a comment, look at D5, switch home off: nothing is lost",async()=>{
+  const d=today();
+  const {ctx,page,errors}=await openApp({hash:'log'});
+  await page.click('.daybtn[data-day="D4"]');await page.click('#b-home');
+  await page.fill('#f-bw','115');
+  for(const i of [0,1]){await page.fill(`input[data-ex="d4-pd"][data-i="${i}"][data-f="reps"]`,'12');await page.fill(`input[data-ex="d4-cc"][data-i="${i}"][data-f="reps"]`,'15');}
+  await page.fill('#f-notes','Felt very light on the biceps');
+  await waitSaved(page,d,s=>!!(s&&s.notes&&s.entries['d4-pd']&&s.entries['d4-pd'].sets.length===2&&s.entries['d4-cc']));
+  const before=(await savedSessions(page))[d];
+  await page.click('.daybtn[data-day="D5"]');
+  assert.equal(await homeOn(page),'false','home does not follow you to another day');
+  await page.click('#b-home');await page.waitForTimeout(900);
+  await page.click('#b-home');await page.waitForTimeout(900);
+  await page.fill('#f-bw','114');await page.waitForTimeout(900);
+  const after=(await savedSessions(page))[d];
+  assert.deepEqual(after,before,'the saved D4 workout is untouched');
+  assert.match(await page.textContent('#sync'),/Not saved: .* already has a D4 workout/);
+  // back on D4: everything is still there, and switching home off keeps the lifts that have sets
+  await page.click('.daybtn[data-day="D4"]');
+  assert.equal(await homeOn(page),'true');
+  assert.equal(await page.inputValue('#f-notes'),'Felt very light on the biceps');
+  await page.click('#b-home');
+  await page.waitForTimeout(900);
+  const kept=(await savedSessions(page))[d];
+  assert.equal(kept.entries['d4-pd'].sets.length,2);assert.equal(kept.entries['d4-cc'].sets.length,2);assert.equal(kept.notes,'Felt very light on the biceps');
+  assert.deepEqual(errors,[]);
+  await ctx.close();
+});
+
+test('the manual Save button cannot replace another day either',async()=>{
+  const d=today();
+  const s=sessionOf(d,'D4',{'d4-hc':{sets:setsOf(10,12)}});
+  const {ctx,page}=await openApp({hash:'log',ls:{'split-sessions-v2':{[d]:s}}});
+  await page.click('.daybtn[data-day="D5"]');
+  await page.fill('input[data-ex="d5-mcp"][data-i="0"][data-f="reps"]','10');
+  await page.click('#b-save');
+  assert.match(await page.textContent('#toast'),/Not saved/);
+  assert.equal((await savedSessions(page))[d].day,'D4');
+  await ctx.close();
+});
+
+test('the home switch is for the day you are on: other days stay at the gym',async()=>{
+  const {ctx,page}=await openApp({hash:'log'});
+  await page.click('.daybtn[data-day="D4"]');await page.click('#b-home');
+  for(const day of ['D1','D2','D3','D5']){
+    await page.click('.daybtn[data-day="'+day+'"]');
+    assert.equal(await homeOn(page),'false',day+' is not at home');
+    assert.equal(await page.$$eval('.tag.home',n=>n.length),0);
+  }
+  await ctx.close();
+});
+
+test('a day with only body weight, the home switch or notes is not a workout and does not move the plan',async()=>{
+  const wed=daysAgo(2),stub=today();
+  const ls={'split-sessions-v2':{
+    [wed]:sessionOf(wed,'D3',{'d3-lp':{sets:setsOf(80,12)}}),
+    [stub]:sessionOf(stub,'D5',{},{bw:115,home:true,notes:'x'})}};
+  const {ctx,page}=await openApp({hash:'log',ls});
+  await page.$eval('#f-date',(el,v)=>{el.value=v;el.dispatchEvent(new Event('change',{bubbles:true}));},daysAgo(-1));
+  assert.equal(await nextDay(page),'D4','the plan carries on from the last real workout, not from the stub');
+  await page.click('nav button[data-tab="stats"]');
+  const t=await page.textContent('#tab-stats');
+  assert.match(t,/1 workout ·/);assert.doesNotMatch(t,/D5 Chest/);
+  assert.match(t,/Latest 115 kg/,'the body weight still counts');
+  await ctx.close();
+});
+
+test('skipping a day: doing D4 on Friday after Wednesday D3 moves the plan to D5',async()=>{
+  const wed=daysAgo(2),d=today();
+  const ls={'split-sessions-v2':{[wed]:sessionOf(wed,'D3',{'d3-lp':{sets:setsOf(80,12)}})}};
+  const {ctx,page}=await openApp({hash:'log',ls});
+  assert.equal(await nextDay(page),'D4');
+  await page.click('.daybtn[data-day="D4"]');
+  await page.fill('input[data-ex="d4-hc"][data-i="0"][data-f="reps"]','12');
+  await waitSaved(page,d,s=>!!(s&&s.day==='D4'&&s.entries['d4-hc']));
+  await page.$eval('#f-date',(el,v)=>{el.value=v;el.dispatchEvent(new Event('change',{bubbles:true}));},daysAgo(-1));
+  assert.equal(await nextDay(page),'D5','after D4 the plan moves on to D5, whatever day of the week it is');
+  await ctx.close();
+});
+
+test('a finished workout, at home or at the gym, marks its day as done and counts',async()=>{
+  const t=today();
+  for(const home of [true,false]){
+    const e=home?{'d4-cc':{sets:setsOf(5,15),alt:'home'},'d4-pd':{sets:setsOf(12,12),alt:'home'}}:{'d4-cc':{sets:setsOf(20,12)},'d4-pd':{sets:setsOf(25,12)}};
+    const {ctx,page}=await openApp({hash:'stats',ls:{'split-sessions-v2':{[t]:sessionOf(t,'D4',e,home?{home:true}:{})}}});
+    const cell=await page.$eval('.cal .cd.today',c=>({cls:c.className,sets:c.title}));
+    assert.doesNotMatch(cell.cls,/\bl0\b/,(home?'home':'gym')+' day is filled in');
+    assert.match(await page.textContent('#tab-stats'),/1 workout ·/);
+    await ctx.close();
+  }
+});
