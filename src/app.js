@@ -23,7 +23,7 @@ const esc=s=>String(s==null?'':s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;'
 const LS_SAT='split-settings-at-v1',LS_SDIRTY='split-settings-dirty-v1',LS_SSHA='split-settings-sha-v1';
 const LS_S='split-sessions-v2',LS_SA='split-sessions-at-v1',LS_Q='split-queue-v1',LS_C='split-sync-cfg-v1',LS_H='split-shas-v1',LS_L='split-lastsync-v1';
 const BUILD='__BUILD__';
-const DATE_RE=/^\d{4}-\d{2}-\d{2}$/,FILE_RE=/^\d{4}-\d{2}-\d{2}\.json$/,REPO_RE=/^[\w.-]+\/[\w.-]+$/;
+const DATE_RE=/^\d{4}-\d{2}-\d{2}$/,FILE_RE=/^\d{4}-\d{2}-\d{2}\.json$/,REPO_RE=/^(?!\.{1,2}\/)[\w.-]+\/(?!\.{1,2}$)[\w.-]+$/;
 const dayOf=id=>DAYS.find(x=>x.id===id)||null;
 const lsGet=(k,d)=>{try{const v=localStorage.getItem(k);return v?JSON.parse(v):d;}catch(e){return d;}};
 const lsSet=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v));return true;}catch(e){return false;}};
