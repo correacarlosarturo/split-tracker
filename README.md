@@ -31,6 +31,8 @@ Each exercise shows a short animation of its start and end position, the form cu
 
 **Gym busy?** Every lift lists alternatives (cable, machine, dumbbell, band). Logging one keeps its history separate from the original.
 
+**Training at home?** Tap **Train at home** under the day buttons. Every lift swaps to a home version built for a pair of 5 kg dumbbells, 6, 8 and 12 kg kettlebells and bodyweight, with no bench. It applies to that day only: turn it off and the gym lifts come back, and the Gym busy list on each lift keeps working. Home lifts keep their own history, and a kettlebell lift moves up to the next bell you own.
+
 **Skipping a lift?** Tap **Skip today** under it. The lift is skipped for that day only: the plan and the other days stay as they are, and its next weight still follows your last real session. Tap **Undo skip** to bring it back.
 
 </td>
@@ -164,7 +166,7 @@ python3 src/build.py && node tools/readme-shots.js
 
 Commit and push, and GitHub Pages redeploys in a minute or two. Each build that reaches `main` is published as a GitHub release named after its version, the same number the app shows under Settings → App version. The service worker serves the cached copy when offline and the fresh copy when online.
 
-Plan data (exercises, sets, rep ranges, start weights) lives in `src/data.js`, and the alternatives in `src/alts.js`.
+Plan data (exercises, sets, rep ranges, start weights) lives in `src/data.js`, the alternatives in `src/alts.js`, and the home versions in `src/home.js`.
 
 ## Privacy
 
