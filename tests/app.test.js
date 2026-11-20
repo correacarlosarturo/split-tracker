@@ -589,3 +589,107 @@ test('a day with only skips is not a workout, and undoing the only skip leaves n
   assert.deepEqual(errors,[]);
   await ctx.close();
 });
+
+/* ---------- train at home ---------- */
+const homeOn=page=>page.$eval('#b-home',b=>b.getAttribute('aria-checked'));
+const titles=page=>page.$$eval('.card.ex h3',n=>n.map(x=>x.textContent));
+async function waitSaved(page,d,ok){for(let i=0;i<80;i++){if(ok((await savedSessions(page))[d]))return;await page.waitForTimeout(100);}throw new Error('not saved');}
+
+test('every lift on every day has a home version that uses only the equipment at home',async()=>{
+  const {ctx,page}=await openApp({hash:'log'});
+  const r=await page.evaluate(()=>EX.map(e=>({id:e.id,h:HOME[e.k]||null})));
+  const owned=[0,5,6,8,12];
+  for(const {id,h} of r){
+    assert.ok(h,id+' has a home version');
+    assert.ok(['dumbbell','kettlebell','bodyweight'].includes(h.eq),id+' uses home equipment');
+    assert.ok(h.w.every(x=>owned.includes(x))&&h.w.includes(h.kg),id+' only suggests weights you own');
+    assert.doesNotMatch(h.n+' '+h.cue,/bench|squat|lunge|cable|machine/i,id+' needs no bench and stays off squats and lunges');
+  }
+  for(const d of ['D1','D2','D3','D4','D5']){await page.click('.daybtn[data-day="'+d+'"]');assert.equal(await homeOn(page),'false');}
+  await ctx.close();
+});
+
+test('Train at home swaps every lift for that day, and turning it off restores the gym lifts',async()=>{
+  const d=today();
+  const {ctx,page,errors}=await openApp({hash:'log'});
+  await page.click('.daybtn[data-day="D4"]');
+  const gym=await titles(page);
+  await page.click('#b-home');
+  assert.equal(await homeOn(page),'true');
+  const home=await titles(page);
+  assert.deepEqual(home,['Dumbbell curl','Dumbbell hammer curl','One-arm overhead dumbbell extension','Seated kettlebell tricep extension','One-arm kettlebell press','Dumbbell reverse fly','Reverse crunch']);
+  assert.match(await page.textContent('#x-d4-pd'),/at home, instead of Rope pushdown/);
+  assert.match(await page.textContent('#x-d4-pd'),/Next: 12 kg/);
+  assert.match(await page.textContent('#x-d4-sp'),/Next: 8 kg/);
+  await waitSaved(page,d,s=>!!(s&&s.home===true));
+  // a reload keeps it on
+  await page.reload();await page.waitForSelector('#tab-log section');
+  assert.equal(await homeOn(page),'true');assert.deepEqual(await titles(page),home);
+  // another date is a gym day again
+  await page.$eval('#f-date',(el,v)=>{el.value=v;el.dispatchEvent(new Event('change',{bubbles:true}));},daysAgo(-1));
+  await page.click('.daybtn[data-day="D4"]');
+  assert.equal(await homeOn(page),'false');assert.deepEqual(await titles(page),gym);
+  // back to today, switch off: gym lifts return and the empty day is removed
+  await page.$eval('#f-date',(el,v)=>{el.value=v;el.dispatchEvent(new Event('change',{bubbles:true}));},d);
+  await page.click('#b-home');
+  assert.equal(await homeOn(page),'false');assert.deepEqual(await titles(page),gym);
+  await page.waitForFunction(k=>!JSON.parse(localStorage.getItem('split-sessions-v2')||'{}')[k],d,{timeout:8000});
+  // the plan is untouched
+  await page.click('nav button[data-tab="plan"]');
+  assert.match(await page.textContent('#tab-plan'),/Rope pushdown/);
+  assert.deepEqual(errors,[]);
+  await ctx.close();
+});
+
+test('home sets save with their own history, and lifts already logged keep what they are',async()=>{
+  const d=today();
+  const {ctx,page,errors}=await openApp({hash:'log'});
+  await page.click('.daybtn[data-day="D4"]');
+  await page.fill('input[data-ex="d4-cc"][data-i="0"][data-f="reps"]','12');
+  await page.click('#b-home');
+  assert.match(await page.textContent('#x-d4-cc h3'),/^Cable curl$/,'a lift with sets typed stays as it is');
+  assert.match(await page.textContent('#x-d4-pd h3'),/Seated kettlebell tricep extension/);
+  for(const i of [0,1])await page.fill(`input[data-ex="d4-pd"][data-i="${i}"][data-f="reps"]`,'15');
+  await waitSaved(page,d,s=>!!(s&&s.home&&s.entries['d4-pd']&&s.entries['d4-pd'].sets.length===2));
+  const s=(await savedSessions(page))[d];
+  assert.deepEqual(s.entries['d4-pd'],{sets:[{kg:12,reps:15},{kg:12,reps:15}],alt:'home'});
+  assert.equal(s.entries['d4-cc'].alt,undefined);
+  // switching off keeps the home lift that has sets
+  await page.click('#b-home');
+  assert.match(await page.textContent('#x-d4-pd h3'),/Seated kettlebell tricep extension/);
+  assert.match(await page.textContent('#x-d4-sp h3'),/Shoulder press \(machine\)/);
+  // next time at home: 12 kg is the heaviest bell, so it asks for slower lowering; the gym pushdown keeps its own history
+  await page.$eval('#f-date',(el,v)=>{el.value=v;el.dispatchEvent(new Event('change',{bubbles:true}));},daysAgo(-7));
+  await page.click('.daybtn[data-day="D4"]');
+  assert.match(await page.textContent('#x-d4-pd'),/No history yet/);
+  await page.click('#b-home');
+  assert.match(await page.textContent('#x-d4-pd'),/heaviest you have, so lower for 3 seconds/);
+  assert.deepEqual(errors,[]);
+  await ctx.close();
+});
+
+test('a kettlebell lift moves up to the next bell you own',async()=>{
+  const d0=daysAgo(3);
+  const s={date:d0,day:'D4',home:true,savedAt:new Date().toISOString(),entries:{'d4-sp':{sets:[{kg:8,reps:12},{kg:8,reps:12}],alt:'home'}}};
+  const {ctx,page}=await openApp({hash:'log',ls:{'split-sessions-v2':{[d0]:s}}});
+  await page.click('.daybtn[data-day="D4"]');
+  await page.click('#b-home');
+  assert.match(await page.textContent('#x-d4-sp'),/Next: 12 kg/);assert.match(await page.textContent('#x-d4-sp'),/Move up to 12 kg/);
+  assert.match(await page.textContent('.recent'),/at home/);
+  await ctx.close();
+});
+
+test('with Train at home on, the Gym busy alternatives and Back to the gym lift still work',async()=>{
+  const {ctx,page,errors}=await openApp({hash:'log'});
+  await page.click('.daybtn[data-day="D4"]');
+  await page.click('#b-home');
+  await page.click('#x-d4-cr summary');
+  assert.match(await page.textContent('#x-d4-cr summary'),/Gym busy\? 2 alternatives/);
+  await page.click('#x-d4-cr [data-alt="d4-cr|msc"]');
+  assert.match(await page.textContent('#x-d4-cr h3'),/Machine seated crunch/);
+  await page.click('#x-d4-sp .backgym');
+  assert.match(await page.textContent('#x-d4-sp h3'),/Shoulder press \(machine\)/);
+  assert.equal(await homeOn(page),'true');
+  assert.deepEqual(errors,[]);
+  await ctx.close();
+});

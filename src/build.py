@@ -8,7 +8,7 @@ def wr(n,t):
     with open(os.path.join(R,n),'w',encoding='utf-8') as f:f.write(t)
 b=time.strftime('%Y-%m-%d.%H%M%S',time.gmtime())
 d=rd('data.js').replace("if(typeof module!=='undefined')module.exports","if(false)module.exports")
-js='\n'.join([d,rd('alts.js'),rd('altimg.js'),rd('figimg.js'),rd('app.js').replace('__BUILD__',b)])
+js='\n'.join([d,rd('alts.js'),rd('home.js'),rd('altimg.js'),rd('figimg.js'),rd('app.js').replace('__BUILD__',b)])
 t=rd('template.html').replace('__BUILD__',b)
 wr('index.html',t)
 wr('split.js',js)

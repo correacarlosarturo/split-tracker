@@ -38,10 +38,11 @@ function cleanSession(date,v){
     const sets=(Array.isArray(en.sets)?en.sets:[]).map(s=>s&&typeof s==='object'?{kg:num(s.kg),reps:num(s.reps)}:null).filter(s=>s&&s.kg!==null&&s.kg>=0&&s.reps!==null&&s.reps>0);
     if(!sets.length){if(en.skipped===true)out.entries[id]={sets:[],skipped:true};continue;}
     const e={sets};
-    if(typeof en.alt==='string'&&(ALT[ex.k]||[]).some(a=>a.id===en.alt))e.alt=en.alt;
+    if(typeof en.alt==='string'&&altsFor(ex.k).some(a=>a.id===en.alt))e.alt=en.alt;
     const r=num(en.rpe);if(r!==null&&r>0)e.rpe=r;
     out.entries[id]=e;
   }
+  if(v.home===true)out.home=true;
   const bw=num(v.bw);if(bw!==null&&bw>0)out.bw=bw;
   if(typeof v.notes==='string'&&v.notes.trim())out.notes=v.notes.trim();
   if(typeof v.savedAt==='string'&&!isNaN(Date.parse(v.savedAt)))out.savedAt=v.savedAt;
@@ -59,7 +60,7 @@ function cleanBackup(b){
     if(en.rpe!=null)entries[id].rpe=String(en.rpe);
     if(en.skipped===true)entries[id].skipped=true;
   }
-  return{date:b.date,day:b.day,bw:str(b.bw)||'',notes:typeof b.notes==='string'?b.notes:'',entries};
+  const o={date:b.date,day:b.day,bw:str(b.bw)||'',notes:typeof b.notes==='string'?b.notes:'',entries};if(b.home===true)o.home=true;return o;
 }
 function idbOpen(){return new Promise((res,rej)=>{try{const r=indexedDB.open('split',1);r.onupgradeneeded=()=>r.result.createObjectStore('kv');r.onsuccess=()=>res(r.result);r.onerror=()=>rej(r.error);}catch(e){rej(e);}});}
 async function idbPut(k,v){try{const d=await idbOpen();await new Promise((res,rej)=>{const t=d.transaction('kv','readwrite');t.objectStore('kv').put(v,k);t.oncomplete=res;t.onerror=()=>rej(t.error);});return true;}catch(e){return false;}}
@@ -249,7 +250,7 @@ async function initDb(){
   refreshStatus();schedSync(800);
 }
 /* a day where every lift was skipped, with no weight or note, is saved so the skips stick but is not a workout */
-const skipOnly=s=>!s.bw&&!s.notes&&Object.values(s.entries||{}).length>0&&Object.values(s.entries).every(e=>e.skipped===true);
+const skipOnly=s=>!s.bw&&!s.notes&&(Object.values(s.entries||{}).length>0||s.home===true)&&Object.values(s.entries||{}).every(e=>e.skipped===true);
 function realList(){return Object.keys(state.sessions).sort().map(k=>state.sessions[k]).filter(s=>!skipOnly(s));}
 
 /* ---------- sample week so the page is complete at rest ---------- */
@@ -292,7 +293,7 @@ function heat(sessions,now,win){
   return out;
 }
 const entryKey=(ex,en)=>en&&en.alt?ex.k+'~'+en.alt:ex.k;
-const altOf=(ex,en)=>en&&en.alt?(ALT[ex.k]||[]).find(a=>a.id===en.alt)||null:null;
+const altOf=(ex,en)=>en&&en.alt?altsFor(ex.k).find(a=>a.id===en.alt)||null:null;
 function lastEntry(k,beforeDate){
   const keys=Object.keys(state.sessions).sort().reverse();
   for(const d of keys){
@@ -309,6 +310,8 @@ function suggest(ex,beforeDate,alt){
   if(!l)return{kg:start,text:start?'First time: start at '+fmtKg(start)+' kg and stop 2 reps before failure.':'No added weight. Aim for the top of the rep range with control.'};
   const top=Math.max.apply(null,l.sets.map(s=>s.kg)),atTop=l.sets.filter(s=>s.kg===top);
   const allHi=atTop.length>=ex.s&&atTop.every(s=>s.reps>=ex.r[1]);
+  if(allHi&&alt&&alt.w&&alt.w.length>1){const nx=alt.w.find(x=>x>top);return nx?{kg:nx,text:'Every set hit '+ex.r[1]+' reps. Move up to '+fmtKg(nx)+' kg.'}:{kg:top,text:'Every set hit '+ex.r[1]+' reps. '+fmtKg(top)+' kg is the heaviest you have, so lower for 3 seconds on every rep.'};}
+  if(allHi&&alt&&alt.w&&alt.w[0]>0)return{kg:top,text:'Every set hit '+ex.r[1]+' reps. '+fmtKg(top)+' kg is the heaviest you have, so lower for 3 seconds on every rep.'};
   if(allHi)return step?{kg:top+step,text:'Every set hit '+ex.r[1]+' reps. Add '+fmtKg(step)+' kg.'}:{kg:top,text:'Every set hit '+ex.r[1]+' reps. Slow the lowering down or move to a harder variation.'};
   if(l.sets.some(s=>s.reps<ex.r[0]))return{kg:top,text:'Stay at '+fmtKg(top)+' kg until every set reaches '+ex.r[0]+' reps.'};
   return{kg:top,text:'Stay at '+fmtKg(top)+' kg and add a rep per set until all hit '+ex.r[1]+'.'};
@@ -322,21 +325,31 @@ function suggestedDay(){
 
 /* ---------- draft handling ---------- */
 function blankDraft(date,day){return{date,day,bw:'',notes:'',entries:{}};}
+/* Train at home, for this day only. Lifts with sets already typed, or skipped, keep what they are. */
+const hasSets=en=>!!(en&&(en.sets||[]).some(x=>x&&String(x.reps==null?'':x.reps).trim()!==''));
+function setHome(d,on){
+  if(on)d.home=true;else delete d.home;
+  for(const ex of EX.filter(e=>e.d===d.day)){
+    const en=d.entries[ex.id];if(en&&(en.skipped===true||hasSets(en)))continue;
+    if(on&&HOME[ex.k]){const e=en||(d.entries[ex.id]={sets:[]});e.alt='home';e.sets=[];delete e.rpe;}
+    else if(!on&&en&&en.alt==='home'){delete en.alt;en.sets=[];delete en.rpe;}
+  }
+}
 function initDraft(date){
   state.date=date;state.confirmDel=false;
   const ex=state.sessions[date];
-  if(ex){state.draft=JSON.parse(JSON.stringify(ex));state.draft.bw=ex.bw||'';state.draft.notes=ex.notes||'';state.draft.entries=state.draft.entries||{};}
+  if(ex){state.draft=JSON.parse(JSON.stringify(ex));state.draft.bw=ex.bw||'';state.draft.notes=ex.notes||'';state.draft.entries=state.draft.entries||{};if(ex.home)setHome(state.draft,true);}
   else state.draft=blankDraft(date,(state.draft&&!state.sessions[state.draft.date]&&state.draft.day)||suggestedDay());
   state.dirty=false;
 }
 function cleanDraft(){
   const d=state.draft,out={date:d.date,day:d.day,entries:{},savedAt:new Date().toISOString()};
-  const bw=num(d.bw);if(bw)out.bw=bw;if(d.notes&&d.notes.trim())out.notes=d.notes.trim();
+  const bw=num(d.bw);if(bw)out.bw=bw;if(d.notes&&d.notes.trim())out.notes=d.notes.trim();if(d.home===true)out.home=true;
   for(const id in d.entries){
     const ex=exById(id);if(!ex||ex.d!==d.day)continue;
     if(d.entries[id].skipped===true){out.entries[id]={sets:[],skipped:true};continue;}/* skipped for this day only: typed sets stay in the draft so Undo can bring them back */
     const sets=(d.entries[id].sets||[]).map(s=>s?{kg:num(s.kg),reps:num(s.reps)}:null).filter(s=>s&&s.reps>0&&s.kg!==null&&s.kg>=0);
-    if(sets.length){out.entries[id]={sets};const al=d.entries[id].alt;if(al&&(ALT[ex.k]||[]).some(x=>x.id===al))out.entries[id].alt=al;const r=num(d.entries[id].rpe);if(r)out.entries[id].rpe=r;}
+    if(sets.length){out.entries[id]={sets};const al=d.entries[id].alt;if(al&&altsFor(ex.k).some(x=>x.id===al))out.entries[id].alt=al;const r=num(d.entries[id].rpe);if(r)out.entries[id].rpe=r;}
   }
   return out;
 }
@@ -351,7 +364,7 @@ function scheduleAuto(){backupDraft();clearTimeout(autoT);refreshStatus();autoT=
 async function autoSave(){
   clearTimeout(autoT);if(!state.dirty||saving)return;
   const d=cleanDraft();
-  if(!Object.keys(d.entries).length&&!d.bw&&!d.notes){
+  if(!Object.keys(d.entries).length&&!d.bw&&!d.notes&&!d.home){
     const old=state.sessions[d.date];
     if(old&&skipOnly(old)){saving=true;try{await db.doc('sessions/'+d.date).delete();state.dirty=false;clearBackup();state.lastLocal=hhmm();refreshStatus();try{renderStats();}catch(e){}}catch(e){}saving=false;}
     return;
@@ -399,11 +412,13 @@ function bodySvg(side,fillFor,label,H){
 /* ---------- renderers ---------- */
 function renderAll(){renderLog();renderPlan();renderStats();renderCoach();}
 const figHtml=(ex)=>{const f=FIGIMG.imgs[FIGIMG.map[ex.id]];if(!f)return'';return`<div class="fx" role="img" aria-label="${ex.n}: start and end position"><img src="${f[0]}" alt="" loading="lazy" decoding="async"><img src="${f[1]}" alt="" loading="lazy" decoding="async"></div>`;};
+const altFig=a=>a.rid&&ALTIMG[a.rid]?`<div class="fx static"><img src="${ALTIMG[a.rid]}" alt=""></div>`:a.fig&&FIGIMG.imgs[a.fig]?`<div class="fx" role="img" aria-label="${a.n}: start and end position"><img src="${FIGIMG.imgs[a.fig][0]}" alt="" loading="lazy" decoding="async"><img src="${FIGIMG.imgs[a.fig][1]}" alt="" loading="lazy" decoding="async"></div>`:'';
 const srcTag=ex=>ex.src==='swap'?'<span class="tag swap">swapped</span>':ex.src==='add'?'<span class="tag add">added</span>':ex.tw?'<span class="tag tw">sets changed</span>':'<span class="tag reel">from reel</span>';
 
 function altsHtml(ex,cur){
   const L=ALT[ex.k]||[];if(!L.length)return'';
-  return`<details class="alts"${cur?' open':''}><summary>Gym busy? ${L.length} alternatives</summary><div class="alist">${L.map(a=>{const on=cur&&cur.id===a.id;return`<div class="alt${on?' on':''}"><img src="${ALTIMG[a.rid]}" alt="" loading="lazy" decoding="async"><div class="ai"><b>${a.n}</b> <span class="tag">${a.eq}</span><p>${a.cue}</p><p class="hist">Same ${ex.s} × ${ex.r[0]}–${ex.r[1]} · start ${a.kg?fmtKg(a.kg)+' '+a.u:a.u}</p></div><button class="btn mini${on?'':' primary'}" data-alt="${ex.id}|${on?'':a.id}">${on?'Back to '+ex.n:'Use today'}</button></div>`;}).join('')}</div><p class="sub">Alternatives train the same muscles. Starting weights are estimates, so keep 2 reps in reserve.</p></details>`;
+  const hm=cur&&cur.home?cur:null;if(hm)cur=null;
+  return`${hm?`<button class="btn mini backgym" type="button" data-alt="${ex.id}|">Back to ${ex.n}</button>`:''}<details class="alts"${cur?' open':''}><summary>Gym busy? ${L.length} alternatives</summary><div class="alist">${L.map(a=>{const on=cur&&cur.id===a.id;return`<div class="alt${on?' on':''}"><img src="${ALTIMG[a.rid]}" alt="" loading="lazy" decoding="async"><div class="ai"><b>${a.n}</b> <span class="tag">${a.eq}</span><p>${a.cue}</p><p class="hist">Same ${ex.s} × ${ex.r[0]}–${ex.r[1]} · start ${a.kg?fmtKg(a.kg)+' '+a.u:a.u}</p></div><button class="btn mini${on?'':' primary'}" data-alt="${ex.id}|${on?'':a.id}">${on?'Back to '+ex.n:'Use today'}</button></div>`;}).join('')}</div><p class="sub">Alternatives train the same muscles. Starting weights are estimates, so keep 2 reps in reserve.</p></details>`;
 }
 function renderLog(){
   const root=$('#tab-log');if(!state.draft)initDraft(state.date);
@@ -414,6 +429,7 @@ function renderLog(){
   const exists=!!state.sessions[d.date];
   let h=`<section class="card head"><div class="row"><label class="fld"><span>Date</span><input type="date" id="f-date" value="${esc(d.date)}"></label><label class="fld"><span>Body weight, kg</span><input type="text" inputmode="decimal" id="f-bw" value="${esc(d.bw||'')}" placeholder="optional"></label></div>
   <div class="days" role="tablist">${DAYS.map(x=>`<button class="daybtn${x.id===d.day?' on':''}" data-day="${x.id}"><b>${x.id}</b><span>${x.name}</span>${x.id===suggestedDay()&&!exists?'<em>next</em>':''}</button>`).join('')}</div>
+  ${exs.some(e=>HOME[e.k])?`<button type="button" class="homesw" id="b-home" role="switch" aria-checked="${d.home?'true':'false'}"><span><b>Train at home</b><em>${d.home?'Dumbbells, kettlebells and bodyweight, today only':'Swap every lift to a home version, today only'}</em></span><i aria-hidden="true"></i></button>`:''}
   <p class="sub">${day.wd} template. ${day.tag}. About ${dayStats(day.id).sets} sets, ${dayStats(day.id).min} min.</p>
   <div class="ready"><span class="lbl">Muscles for this day if you train now</span>${ready}</div></section>`;
   {const co=state.coach&&state.coach[d.date];if(co&&co.summary)h+=`<section class="card coachnote"><h3 class="sec">Coach · for today</h3><p>${esc(co.summary)}</p></section>`;}
@@ -426,14 +442,14 @@ function renderLog(){
       const v=en[i]||{};const kg=v.kg!=null?v.kg:fmtKg(sg.kg);
       rows+=`<div class="set"><span class="n">${i+1}</span><label><input type="text" inputmode="decimal" data-ex="${ex.id}" data-i="${i}" data-f="kg" value="${esc(kg)}" aria-label="${ex.n} set ${i+1} weight"></label><span class="x">kg ×</span><label><input type="text" inputmode="numeric" data-ex="${ex.id}" data-i="${i}" data-f="reps" value="${esc(v.reps)}" placeholder="${ex.r[0]}-${ex.r[1]}" aria-label="${ex.n} set ${i+1} reps"></label></div>`;
     }
-    return`<section class="card ex" id="x-${ex.id}"><div class="exhead"><div><h3>${alt?alt.n:ex.n}</h3><div class="meta"><span class="big">${ex.s} × ${ex.r[0]}–${ex.r[1]}</span> ${alt?`<span class="tag swap">instead of ${ex.n}</span>`:srcTag(ex)}</div></div></div>
-    <div class="exbody">${alt?`<div class="fx static"><img src="${ALTIMG[alt.rid]}" alt=""></div>`:figHtml(ex)}<div class="info"><p class="cue">${alt?alt.cue:ex.cue}</p><p class="tgt"><b>Next: ${fmtKg(sg.kg)} kg</b> <span>${alt?alt.u:ex.u}</span><br>${sg.text}</p><p class="hist">${last}</p>${!alt&&ex.note?`<p class="note">${ex.note}</p>`:''}${!alt&&ex.tw?`<p class="note">Sets changed from ${ex.rs} to ${ex.s}. ${ex.tw}</p>`:''}</div></div>${altsHtml(ex,alt)}
+    return`<section class="card ex" id="x-${ex.id}"><div class="exhead"><div><h3>${alt?alt.n:ex.n}</h3><div class="meta"><span class="big">${ex.s} × ${ex.r[0]}–${ex.r[1]}</span> ${alt?`<span class="tag ${alt.home?'home':'swap'}">${alt.home?'at home, ':''}instead of ${ex.n}</span>`:srcTag(ex)}</div></div></div>
+    ${(()=>{const f=alt?altFig(alt):figHtml(ex);return`<div class="exbody${f?'':' noimg'}">${f}`;})()}<div class="info"><p class="cue">${alt?alt.cue:ex.cue}</p><p class="tgt"><b>Next: ${fmtKg(sg.kg)} kg</b> <span>${alt?alt.u:ex.u}</span><br>${sg.text}</p><p class="hist">${last}</p>${!alt&&ex.note?`<p class="note">${ex.note}</p>`:''}${!alt&&ex.tw?`<p class="note">Sets changed from ${ex.rs} to ${ex.s}. ${ex.tw}</p>`:''}</div></div>${altsHtml(ex,alt)}
     <div class="sets">${rows}</div><label class="rpe">Effort (RPE 6–10) <input type="text" inputmode="decimal" data-ex="${ex.id}" data-f="rpe" value="${esc((d.entries[ex.id]||{}).rpe||'')}" placeholder="optional" aria-label="${ex.n} effort"></label><button class="btn skipbtn" type="button" data-skip="${ex.id}" aria-label="Skip ${ex.n} today">Skip today</button></section>`;
   }).join('');
   h+=`<section class="card"><label class="fld"><span>Session notes</span><textarea id="f-notes" rows="2" placeholder="Sleep, how it felt, anything Claude should know">${esc(d.notes||'')}</textarea></label>
   <div class="actions"><button class="btn primary" id="b-save">${exists?'Update session':'Save session'}</button>${exists?`<button class="btn ghost danger" id="b-del">${state.confirmDel?'Tap again to delete':'Delete session'}</button>`:''}</div></section>`;
   const recent=Object.keys(state.sessions).sort().reverse().slice(0,6);
-  h+=`<section class="card"><h3 class="sec">Recent sessions</h3>${recent.length?`<div class="recent">${recent.map(k=>`<button class="rbtn" data-load="${k}"><b>${fmtDate(k)}</b><span>${esc(state.sessions[k].day)} ${esc((dayOf(state.sessions[k].day)||{}).name)}</span><em>${Object.values(state.sessions[k].entries||{}).filter(e=>!e.skipped).length} lifts${Object.values(state.sessions[k].entries||{}).some(e=>e.skipped)?' · '+Object.values(state.sessions[k].entries).filter(e=>e.skipped).length+' skipped':''}</em></button>`).join('')}</div>`:'<p class="sub">No sessions saved yet. Your first save appears here and feeds the heat map and the coach tab.</p>'}</section>`;
+  h+=`<section class="card"><h3 class="sec">Recent sessions</h3>${recent.length?`<div class="recent">${recent.map(k=>`<button class="rbtn" data-load="${k}"><b>${fmtDate(k)}</b><span>${esc(state.sessions[k].day)} ${esc((dayOf(state.sessions[k].day)||{}).name)}</span><em>${Object.values(state.sessions[k].entries||{}).filter(e=>!e.skipped).length} lifts${Object.values(state.sessions[k].entries||{}).some(e=>e.skipped)?' · '+Object.values(state.sessions[k].entries).filter(e=>e.skipped).length+' skipped':''}${state.sessions[k].home?' · at home':''}</em></button>`).join('')}</div>`:'<p class="sub">No sessions saved yet. Your first save appears here and feeds the heat map and the coach tab.</p>'}</section>`;
   root.innerHTML=h;
 }
 
@@ -598,8 +614,8 @@ function renderCoach(){
 function summaryText(){
   const since=addDays(todayStr(),-13),out=[];
   realList().filter(s=>s.date>=since).forEach(s=>{
-    out.push(s.date+' '+s.day+(s.bw?' bw '+s.bw+'kg':'')+(s.notes?' | '+s.notes:''));
-    for(const id in s.entries){const ex=exById(id);if(ex){const al=altOf(ex,s.entries[id]);out.push(s.entries[id].skipped?'  '+ex.n+': skipped':'  '+(al?al.n+' (alternative to '+ex.n+')':ex.n)+': '+s.entries[id].sets.map(x=>x.kg+'x'+x.reps).join(', ')+(s.entries[id].rpe?' RPE '+s.entries[id].rpe:''));}}
+    out.push(s.date+' '+s.day+(s.home?' at home':'')+(s.bw?' bw '+s.bw+'kg':'')+(s.notes?' | '+s.notes:''));
+    for(const id in s.entries){const ex=exById(id);if(ex){const al=altOf(ex,s.entries[id]);out.push(s.entries[id].skipped?'  '+ex.n+': skipped':'  '+(al?al.n+(al.home?' (home version of ':' (alternative to ')+ex.n+')':ex.n)+': '+s.entries[id].sets.map(x=>x.kg+'x'+x.reps).join(', ')+(s.entries[id].rpe?' RPE '+s.entries[id].rpe:''));}}
   });
   return out.join('\n')||'No sessions saved in the last 14 days.';
 }
@@ -629,8 +645,9 @@ document.addEventListener('click',e=>{
     const nb=$(t.dataset.skip!==undefined?'[data-unskip="'+id+'"]':'[data-skip="'+id+'"]');if(nb)nb.focus({preventScroll:true});
     return;
   }
+  if(t.id==='b-home'){const on=!state.draft.home;setHome(state.draft,on);state.dirty=true;scheduleAuto();const y=window.scrollY;renderLog();window.scrollTo(0,y);const b=$('#b-home');if(b)b.focus({preventScroll:true});toast(on?'Home versions for today':'Back to the gym lifts');return;}
   if(t.dataset.alt!==undefined){const p=t.dataset.alt.split('|'),en=state.draft.entries[p[0]]||(state.draft.entries[p[0]]={});if(p[1])en.alt=p[1];else delete en.alt;en.sets=[];delete en.rpe;state.dirty=true;scheduleAuto();const y=window.scrollY;renderLog();window.scrollTo(0,y);return;}
-  if(t.dataset.day){const ex=state.sessions[state.date];if(ex&&ex.day===t.dataset.day){initDraft(state.date);}else{const bw=state.draft.bw;state.draft=blankDraft(state.date,t.dataset.day);state.draft.bw=bw;state.dirty=false;}renderLog();return;}
+  if(t.dataset.day){const ex=state.sessions[state.date];if(ex&&ex.day===t.dataset.day){initDraft(state.date);}else{const bw=state.draft.bw,hm=state.draft.home;state.draft=blankDraft(state.date,t.dataset.day);state.draft.bw=bw;if(hm)setHome(state.draft,true);state.dirty=false;}renderLog();return;}
   if(t.dataset.load){initDraft(t.dataset.load);renderLog();return window.scrollTo(0,0);}
   if(t.dataset.ar){state.ar=t.dataset.ar;return renderStats();}
   if(t.dataset.wr){state.wr=t.dataset.wr;return renderStats();}
