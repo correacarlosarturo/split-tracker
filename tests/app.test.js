@@ -704,3 +704,17 @@ test('with Train at home on, the Gym busy alternatives and Back to the gym lift 
   assert.deepEqual(errors,[]);
   await ctx.close();
 });
+
+test('home lifts animate whenever a matching animation exists, and use a still otherwise',async()=>{
+  const {ctx,page,errors}=await openApp({hash:'log'});
+  await page.click('.daybtn[data-day="D4"]');await page.click('#b-home');
+  const fx=id=>page.$$eval('#x-'+id+' .fx',n=>n.map(x=>({anim:!x.classList.contains('static'),imgs:x.querySelectorAll('img').length})));
+  for(const id of ['d4-cc','d4-hc','d4-rd'])assert.deepEqual(await fx(id),[{anim:true,imgs:2}],id+' is animated');
+  assert.deepEqual(await fx('d4-sp'),[{anim:false,imgs:1}],'a move with no matching animation shows a still');
+  await page.click('.daybtn[data-day="D2"]');
+  assert.deepEqual(await fx('d2-lr'),[{anim:true,imgs:2}]);
+  await page.click('.daybtn[data-day="D3"]');
+  assert.deepEqual(await fx('d3-rdl'),[{anim:true,imgs:2}]);
+  assert.deepEqual(errors,[]);
+  await ctx.close();
+});

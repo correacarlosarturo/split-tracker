@@ -412,7 +412,7 @@ function bodySvg(side,fillFor,label,H){
 /* ---------- renderers ---------- */
 function renderAll(){renderLog();renderPlan();renderStats();renderCoach();}
 const figHtml=(ex)=>{const f=FIGIMG.imgs[FIGIMG.map[ex.id]];if(!f)return'';return`<div class="fx" role="img" aria-label="${ex.n}: start and end position"><img src="${f[0]}" alt="" loading="lazy" decoding="async"><img src="${f[1]}" alt="" loading="lazy" decoding="async"></div>`;};
-const altFig=a=>a.rid&&ALTIMG[a.rid]?`<div class="fx static"><img src="${ALTIMG[a.rid]}" alt=""></div>`:a.fig&&FIGIMG.imgs[a.fig]?`<div class="fx" role="img" aria-label="${a.n}: start and end position"><img src="${FIGIMG.imgs[a.fig][0]}" alt="" loading="lazy" decoding="async"><img src="${FIGIMG.imgs[a.fig][1]}" alt="" loading="lazy" decoding="async"></div>`:'';
+const altFig=a=>a.fig&&FIGIMG.imgs[a.fig]?`<div class="fx" role="img" aria-label="${a.n}: start and end position"><img src="${FIGIMG.imgs[a.fig][0]}" alt="" loading="lazy" decoding="async"><img src="${FIGIMG.imgs[a.fig][1]}" alt="" loading="lazy" decoding="async"></div>`:a.rid&&ALTIMG[a.rid]?`<div class="fx static"><img src="${ALTIMG[a.rid]}" alt=""></div>`:'';
 const srcTag=ex=>ex.src==='swap'?'<span class="tag swap">swapped</span>':ex.src==='add'?'<span class="tag add">added</span>':ex.tw?'<span class="tag tw">sets changed</span>':'<span class="tag reel">from reel</span>';
 
 function altsHtml(ex,cur){
