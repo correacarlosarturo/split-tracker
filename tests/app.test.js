@@ -108,6 +108,17 @@ test('setup refuses a public repo and stores nothing',async()=>{
   await ctx.close();
 });
 
+test('setup refuses repo names with dot segments, so the token never goes to another API path',async()=>{
+  const {ctx,page}=await openApp({gh:fakeGitHub({})});
+  await page.click('#gear');
+  for(const bad of ['me/..','../data','me/.','./data']){
+    await page.fill('#set-repo',bad);await page.fill('#set-token','tok');await page.click('#set-save');
+    assert.match(await page.textContent('#set-msg'),/owner\/name/);
+  }
+  assert.equal(await page.evaluate(()=>localStorage.getItem('split-sync-cfg-v1')),null);
+  await ctx.close();
+});
+
 test('sync stops sending if the repo became public after setup',async()=>{
   const d=today();
   const gh=fakeGitHub({},{private:false});
